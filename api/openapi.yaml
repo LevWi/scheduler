@@ -33,11 +33,59 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Slot'
+                $ref: '#/components/schemas/AvailableSlots'
+        'default':
+          description: General error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Try to register time slot(s)
+      tags:
+        - Time slots
+      parameters: 
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: slots
+          in: header
+          required: true
+          schema:
+            type: array
+            items: 
+              $ref: '#/components/schemas/Slot'
+              
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                properties:
+                  query_id:
+                    type: string
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+        'default':
+          description: General error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
+    AvailableSlots:
+      properties:
+        query_id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        slots:
+          type: array
+          items:
+                $ref: '#/components/schemas/Slot'
     Slot:
       properties:
         tp_start:
@@ -46,5 +94,16 @@ components:
         tp_end:
           type: string
           format: date-time
+    Error:
+      properties:
+        query_id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        description:
+          type: string
+        code:
+          type: integer
+        
+        
        
     
