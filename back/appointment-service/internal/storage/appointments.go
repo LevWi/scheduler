@@ -46,11 +46,18 @@ func GetSlotInRange(db *sqlx.DB, business_id types.ID, start time.Time, end time
 	return slotsOut, nil
 }
 
+func DeleteSlots(db *sqlx.DB, business_id types.ID, client_id types.ID, start time.Time, end time.Time) error {
+	_, err := db.Exec("DELETE FROM appointments WHERE business_id = $1 AND client_id = $2 AND date_unx BETWEEN $3 AND $4",
+		string(business_id), string(client_id), start.Unix(), end.Unix())
+	return err
+}
+
+// TODO check intersections in range
+
 func AddSlots(db *sqlx.DB, appointment types.Appointment) error {
 	dbSlots := make([]dbSlot, 0, len(appointment.Slots))
 	for _, slot := range appointment.Slots {
 		dbSlots = append(dbSlots, dbSlot{Client: string(slot.Client), Business: string(appointment.Business), Date: slot.Start.Unix(), Len: slot.Len})
-		//dbSlots = append(dbSlots, dbSlot{Client: string(slot.Client), Date: slot.Start.Unix(), Len: slot.Len})
 	}
 
 	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_unx, client_id, len_sec) VALUES (:business_id, :date_unx, :client_id, :len_sec)", dbSlots)
