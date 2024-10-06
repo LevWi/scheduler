@@ -52,4 +52,23 @@ func TestStorage(t *testing.T) {
 			t.FailNow()
 		}
 	}
+
+	err = DeleteSlots(db, appointment.Business, appointment.Slots[0].Client, appointment.Slots[0].Start, appointment.Slots[0].Start)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	slots, err = GetSlotInRange(db, appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(slots) != 1 {
+		t.Fatal("expected 1 slot, got", len(slots))
+	}
+
+	if appointment.Slots[1].Start != slots[0].Start || appointment.Slots[1].Len != slots[0].Len || appointment.Slots[1].Client != slots[0].Client {
+		fmt.Printf("slot mismatch : %+v != %+v", slots[0], appointment.Slots[1])
+		t.FailNow()
+	}
 }
