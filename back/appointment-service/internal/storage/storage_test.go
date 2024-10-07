@@ -23,7 +23,9 @@ func TestStorage(t *testing.T) {
 	}
 	defer db.Close()
 
-	err = createTableAppointments(db)
+	storage := Storage{DB: db}
+
+	err = CreateTableAppointments(&storage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,12 +37,12 @@ func TestStorage(t *testing.T) {
 		},
 	}
 
-	err = AddSlots(db, appointment)
+	err = storage.AddSlots(appointment)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	slots, err := GetSlotInRange(db, appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	slots, err := storage.GetSlotInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,12 +55,12 @@ func TestStorage(t *testing.T) {
 		}
 	}
 
-	err = DeleteSlots(db, appointment.Business, appointment.Slots[0].Client, appointment.Slots[0].Start, appointment.Slots[0].Start)
+	err = storage.DeleteSlots(appointment.Business, appointment.Slots[0].Client, appointment.Slots[0].Start, appointment.Slots[0].Start)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	slots, err = GetSlotInRange(db, appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	slots, err = storage.GetSlotInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,14 +1,15 @@
 package server
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
+	swagger "scheduler/appointment-service/api/types"
 	types "scheduler/appointment-service/internal"
-	storage "scheduler/appointment-service/internal/storage"
+	"scheduler/appointment-service/internal/storage"
 
 	"github.com/gorilla/mux"
 )
@@ -20,7 +21,7 @@ func parseTime(s string) (time.Time, error) {
 func getTimeFromHeader(key string, h http.Header) (time.Time, error) {
 	dtStr := h.Get(key)
 	if dtStr == "" {
-		return time.Time{}, errors.New(fmt.Sprintf("%s not found", key))
+		return time.Time{}, fmt.Errorf("%s not found", key)
 	}
 
 	dt, err := parseTime(dtStr)
@@ -30,7 +31,13 @@ func getTimeFromHeader(key string, h http.Header) (time.Time, error) {
 	return dt, nil
 }
 
-func SlotsBusinessIdGet(w http.ResponseWriter, r *http.Request) {
+func SlotsBusinessIdGetFunc(s *storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		SlotsBusinessIdGet(s, w, r)
+	}
+}
+
+func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	vars := mux.Vars(r)
@@ -54,8 +61,30 @@ func SlotsBusinessIdGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slots, err := storage.GetSlotInRange(storage.DB, types.ID(businessID), dateStart, dateEnd)
+	slots, err := s.GetSlotInRange(types.ID(businessID), dateStart, dateEnd)
+	if err != nil {
+		slog.Warn(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
+	var response swagger.AvailableSlots
+	response.QueryId = "TBD" //TODO
+
+	for _, slot := range slots {
+		response.Slots = append(response.Slots, swagger.Slot{
+			ClientId: string(slot.Client),
+			TpStart:  slot.Start,
+			Len:      int32(slot.Len),
+		})
+	}
+
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		slog.Warn(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
