@@ -44,8 +44,8 @@ func NewRouter(s *storage.Storage) *mux.Router {
 
 	for _, route := range routes {
 		var handler http.Handler
-		handler = route.HandlerFunc
-		handler = Logger(handler, route.Name)
+		handler = Logger(route.HandlerFunc, route.Name)
+		handler = PassRequestIdToCtx(handler)
 
 		router.
 			Methods(route.Method).

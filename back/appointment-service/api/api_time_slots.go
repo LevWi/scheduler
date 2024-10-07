@@ -123,7 +123,7 @@ func SlotsBusinessIdPost(s *storage.Storage, w http.ResponseWriter, r *http.Requ
 		})
 	}
 
-	slog.Info(fmt.Sprintf("%v", appointment))
+	slog.InfoContext(r.Context(), fmt.Sprintf("%v", appointment))
 
 	//TODO work with database
 
