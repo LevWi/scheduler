@@ -8,7 +8,7 @@ import (
 	"time"
 
 	swagger "scheduler/appointment-service/api/types"
-	types "scheduler/appointment-service/internal"
+	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/storage"
 
 	"github.com/gorilla/mux"
@@ -68,7 +68,7 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	slots, err := s.GetBusySlotsInRange(types.ID(businessID), dateStart, dateEnd)
+	slots, err := s.GetBusySlotsInRange(businessID, dateStart, dateEnd)
 	if err != nil {
 		slog.Warn(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -114,10 +114,10 @@ func SlotsBusinessIdPost(s *storage.Storage, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	appointment := types.Appointment{Business: types.ID(businessID), Slots: make([]types.Slot, 0, len(jsonSlots))}
+	appointment := common.Appointment{Business: businessID, Slots: make([]common.Slot, 0, len(jsonSlots))}
 	for _, jsSlot := range jsonSlots {
-		appointment.Slots = append(appointment.Slots, types.Slot{
-			Client: types.ID(jsSlot.ClientId),
+		appointment.Slots = append(appointment.Slots, common.Slot{
+			Client: jsSlot.ClientId,
 			Start:  jsSlot.TpStart,
 			Len:    int(jsSlot.Len),
 		})
