@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type ID string
+type ID = string
 
 type Slot struct {
 	Client ID
