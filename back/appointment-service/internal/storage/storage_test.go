@@ -42,7 +42,7 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slots, err := storage.GetSlotInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	slots, err := storage.GetBusySlotsInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slots, err = storage.GetSlotInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	slots, err = storage.GetBusySlotsInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
 	if err != nil {
 		t.Fatal(err)
 	}

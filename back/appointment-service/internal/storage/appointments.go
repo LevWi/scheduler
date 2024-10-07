@@ -33,7 +33,7 @@ func CreateTableAppointments(db *Storage) error {
 	return nil
 }
 
-func (db *Storage) GetSlotInRange(business_id types.ID, start time.Time, end time.Time) ([]types.Slot, error) {
+func (db *Storage) GetBusySlotsInRange(business_id types.ID, start time.Time, end time.Time) ([]types.Slot, error) {
 	var dbSlots []dbSlot
 	err := db.Select(&dbSlots, "SELECT * FROM appointments WHERE business_id = $1 AND date_unx BETWEEN $2 AND $3",
 		string(business_id), start.Unix(), end.Unix())

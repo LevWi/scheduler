@@ -1,7 +1,5 @@
 package common
 
-//import "github.com/jmoiron/sqlx"
-
 import (
 	"time"
 )

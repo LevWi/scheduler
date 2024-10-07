@@ -38,7 +38,7 @@ func NewRouter(s *storage.Storage) *mux.Router {
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots/{business_id}",
-			SlotsBusinessIdPost,
+			SlotsBusinessIdPostFunc(s),
 		},
 	}
 
