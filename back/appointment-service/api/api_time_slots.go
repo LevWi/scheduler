@@ -37,12 +37,19 @@ func SlotsBusinessIdGetFunc(s *storage.Storage) http.HandlerFunc {
 	}
 }
 
+func SlotsBusinessIdPostFunc(s *storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		SlotsBusinessIdPost(s, w, r)
+	}
+}
+
+// TODO prepare error, prepare QueryId
 func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	vars := mux.Vars(r)
-	businessID, ok := vars["business_id"]
-	if !ok {
+	businessID := vars["business_id"]
+	if businessID == "" {
 		slog.Warn("business_id not found")
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -61,7 +68,7 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	slots, err := s.GetSlotInRange(types.ID(businessID), dateStart, dateEnd)
+	slots, err := s.GetBusySlotsInRange(types.ID(businessID), dateStart, dateEnd)
 	if err != nil {
 		slog.Warn(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -88,7 +95,37 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-func SlotsBusinessIdPost(w http.ResponseWriter, r *http.Request) {
+func SlotsBusinessIdPost(s *storage.Storage, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	vars := mux.Vars(r)
+	businessID := vars["business_id"]
+	if businessID == "" {
+		slog.Warn("business_id not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var jsonSlots []swagger.Slot
+	err := json.NewDecoder(r.Body).Decode(&jsonSlots)
+	if err != nil {
+		slog.Error(err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	appointment := types.Appointment{Business: types.ID(businessID), Slots: make([]types.Slot, 0, len(jsonSlots))}
+	for _, jsSlot := range jsonSlots {
+		appointment.Slots = append(appointment.Slots, types.Slot{
+			Client: types.ID(jsSlot.ClientId),
+			Start:  jsSlot.TpStart,
+			Len:    int(jsSlot.Len),
+		})
+	}
+
+	slog.Info(fmt.Sprintf("%v", appointment))
+
+	//TODO work with database
+
 	w.WriteHeader(http.StatusOK)
 }

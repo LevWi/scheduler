@@ -51,14 +51,13 @@ paths:
           schema:
             type: string
             example: "550e8400-e29b-41d4-a716-446655440000"
-        - name: slots
-          in: header
-          required: true
-          schema:
-            type: array
-            items: 
-              $ref: '#/components/schemas/Slot'
-              
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              type: array
+              items: 
+                $ref: '#/components/schemas/Slot'
       responses:
         '200':
           description: Successful operation
