@@ -42,6 +42,12 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	//Check duplicates
+	err = storage.AddSlots(appointment)
+	if err == nil {
+		t.Fatal(err)
+	}
+
 	slots, err := storage.GetBusySlotsInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
 	if err != nil {
 		t.Fatal(err)

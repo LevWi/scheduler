@@ -21,7 +21,7 @@ func (h ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
-func AppendCtx(parent context.Context, attr slog.Attr) context.Context {
+func AppendSlogCtx(parent context.Context, attr slog.Attr) context.Context {
 	if v, ok := parent.Value(slogKey{}).([]slog.Attr); ok {
 		v = append(v, attr)
 		return context.WithValue(parent, slogKey{}, v)

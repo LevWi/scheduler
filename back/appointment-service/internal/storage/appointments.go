@@ -22,7 +22,8 @@ const queryCreateAppointmentsTable = `CREATE TABLE "appointments" (
 	"date_unx"	  INTEGER NOT NULL,
 	"business_id" TEXT NOT NULL,
 	"client_id"	  TEXT NOT NULL,
-	"len_sec"	  INTEGER NOT NULL CHECK(len_sec >= 5)
+	"len_sec"	  INTEGER NOT NULL CHECK(len_sec >= 5),
+	UNIQUE (business_id, date_unx)
 );`
 
 func CreateTableAppointments(db *Storage) error {
