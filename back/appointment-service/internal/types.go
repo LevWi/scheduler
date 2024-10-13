@@ -12,11 +12,6 @@ type Slot struct {
 	Len    int
 }
 
-type Interval struct {
-	Start time.Time
-	End   time.Time
-}
-
 type Appointment struct {
 	Business ID
 	Slots    []Slot
