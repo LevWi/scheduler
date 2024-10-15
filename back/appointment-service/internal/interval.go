@@ -41,9 +41,28 @@ func (i Intervals) IsSorted() bool {
 }
 
 // Note: Expected sorted slice
-func (intervals Intervals) IsOverlap() bool {
+// TODO check it in debug mode?
+func (intervals Intervals) HasOverlaps() bool {
 	for i := 0; i < len(intervals)-1; i++ {
 		if intervals[i].IsOverlap(intervals[i+1]) {
+			return true
+		}
+	}
+	return false
+}
+
+func (intervals Intervals) IsFit(other Interval) bool {
+	for i := 0; i < len(intervals); i++ {
+		if intervals[i].IsFit(other) {
+			return true
+		}
+	}
+	return false
+}
+
+func (intervals Intervals) IsOverlap(other Interval) bool {
+	for i := 0; i < len(intervals); i++ {
+		if intervals[i].IsOverlap(other) {
 			return true
 		}
 	}

@@ -70,7 +70,7 @@ func TestIntervalSlices(t *testing.T) {
 		t.Fatalf("intervals should be sorted %v", intervals)
 	}
 
-	if !intervals.IsOverlap() {
+	if !intervals.HasOverlaps() {
 		t.Fatalf("intervals should be overlap %v", intervals)
 	}
 
@@ -83,8 +83,8 @@ func TestIntervalSlices(t *testing.T) {
 	if !intervals.IsSorted() {
 		t.Fatalf("intervals should be sorted %v", intervals)
 	}
-	if intervals.IsOverlap() {
-		t.Fatalf("intervals should not be overlap %v", intervals)
+	if intervals.HasOverlaps() {
+		t.Fatalf("intervals should has overlap %v", intervals)
 	}
 
 	intervals = append(intervals, intervals[0])
@@ -95,7 +95,34 @@ func TestIntervalSlices(t *testing.T) {
 	if !intervals.IsSorted() {
 		t.Fatalf("intervals should not be sorted %v", intervals)
 	}
-	if !intervals.IsOverlap() {
-		t.Fatalf("intervals should be overlap %v", intervals)
+	if !intervals.HasOverlaps() {
+		t.Fatalf("intervals should has overlap %v", intervals)
 	}
+}
+
+func TestIntervalSetSlices(t *testing.T) {
+	start := time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC)
+
+	intervals := Intervals{Interval{start, end}}
+
+	if intervals.HasOverlaps() {
+		t.Fatalf("intervals should not has overlap %v", intervals)
+	}
+
+	set := NewIntervalSetWithCopies(intervals, nil)
+	if !set.IsValid() {
+		t.Fatalf("set should be valid %v", set)
+	}
+
+	set.AddExclusion(Interval{start.Add(3 * time.Hour), start.Add(4 * time.Hour)})
+	if !set.IsValid() {
+		t.Fatalf("set should be valid %v", set)
+	}
+
+	validInterval := Interval{start.Add(1 * time.Hour), start.Add(1*time.Hour + 30*time.Minute)}
+	if !set.IsFit(validInterval) {
+		t.Fatalf("interval should fit %v", validInterval)
+	}
+
 }
