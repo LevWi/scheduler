@@ -110,7 +110,11 @@ func TestIntervalSetSlices(t *testing.T) {
 		t.Fatalf("intervals should not has overlap %v", intervals)
 	}
 
-	set := NewIntervalSetWithCopies(intervals, nil)
+	set, err := NewIntervalSetWithCopies(intervals, nil)
+	if err != nil {
+		t.Fatal("unexpected error", set)
+	}
+
 	if !set.IsValid() {
 		t.Fatalf("set should be valid %v", set)
 	}
@@ -125,4 +129,19 @@ func TestIntervalSetSlices(t *testing.T) {
 		t.Fatalf("interval should fit %v", validInterval)
 	}
 
+	invalidInterval := Interval{start.Add(1 * time.Hour), start.Add(4*time.Hour + 30*time.Minute)}
+	if set.IsFit(invalidInterval) {
+		t.Fatalf("interval should not fit %v", invalidInterval)
+	}
+
+	validInterval = Interval{start.Add(2 * time.Hour), start.Add(3 * time.Hour)}
+	if !set.IsFit(validInterval) {
+		t.Fatalf("interval should fit %v", validInterval)
+	}
+
+	invalidInterval = validInterval
+	invalidInterval.End = invalidInterval.End.Add(1 * time.Minute)
+	if set.IsFit(invalidInterval) {
+		t.Fatalf("interval should not fit %v", invalidInterval)
+	}
 }

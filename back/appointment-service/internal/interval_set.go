@@ -23,14 +23,17 @@ func (s *IntervalSet) IsValid() bool {
 	return true
 }
 
-func NewIntervalSetWithCopies(union Intervals, exclusion Intervals) IntervalSet {
+func NewIntervalSetWithCopies(union Intervals, exclusion Intervals) (IntervalSet, error) {
 	tmp := IntervalSet{}
 	tmp.Union = make(Intervals, len(union))
 	tmp.Exclusion = make(Intervals, len(exclusion))
 	copy(tmp.Union, union)
 	copy(tmp.Exclusion, exclusion)
-	tmp.PreparePayload()
-	return tmp
+	err := tmp.PreparePayload()
+	if err != nil {
+		return IntervalSet{}, err
+	}
+	return tmp, nil
 }
 
 func (s *IntervalSet) PreparePayload() error {
