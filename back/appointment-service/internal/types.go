@@ -1,15 +1,10 @@
 package common
 
-import (
-	"time"
-)
-
 type ID = string
 
 type Slot struct {
 	Client ID
-	Start  time.Time
-	Len    int
+	Interval
 }
 
 type Appointment struct {

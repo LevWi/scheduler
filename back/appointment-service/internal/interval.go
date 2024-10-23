@@ -12,10 +12,6 @@ type Interval struct {
 
 type Intervals []Interval
 
-func (s Slot) Interval() Interval {
-	return Interval{Start: s.Start, End: s.Start.Add(time.Duration(s.Len) * time.Second)}
-}
-
 func (i Interval) IsValid() bool {
 	return i.Start.Before(i.End)
 }

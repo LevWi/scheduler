@@ -30,11 +30,15 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	appointment := types.Appointment{
-		Business: "b1", Slots: []types.Slot{
-			{Client: "c1", Start: time.Now().Truncate(time.Minute), Len: 30},
-			{Client: "c2", Start: time.Now().Truncate(time.Minute).Add(30 * time.Minute), Len: 30},
-		},
+	var appointment types.Appointment
+	{
+		tm := time.Now().Truncate(time.Minute)
+		appointment = types.Appointment{
+			Business: "b1", Slots: []types.Slot{
+				{Client: "c1", Interval: types.Interval{Start: tm, End: tm.Add(30 * time.Minute)}},
+				{Client: "c2", Interval: types.Interval{Start: tm.Add(30 * time.Minute), End: tm.Add(60 * time.Minute)}},
+			},
+		}
 	}
 
 	err = storage.AddSlots(appointment)
@@ -55,7 +59,7 @@ func TestStorage(t *testing.T) {
 	t.Log(slots)
 
 	for i, slot := range slots {
-		if appointment.Slots[i].Start != slot.Start || appointment.Slots[i].Len != slot.Len || appointment.Slots[i].Client != slot.Client {
+		if appointment.Slots[i].Start != slot.Start || appointment.Slots[i].End != slot.End || appointment.Slots[i].Client != slot.Client {
 			fmt.Printf("slot mismatch : %+v != %+v", slot, appointment.Slots[i])
 			t.FailNow()
 		}
@@ -75,7 +79,7 @@ func TestStorage(t *testing.T) {
 		t.Fatal("expected 1 slot, got", len(slots))
 	}
 
-	if appointment.Slots[1].Start != slots[0].Start || appointment.Slots[1].Len != slots[0].Len || appointment.Slots[1].Client != slots[0].Client {
+	if appointment.Slots[1].Start != slots[0].Start || appointment.Slots[1].End != slots[0].End || appointment.Slots[1].Client != slots[0].Client {
 		fmt.Printf("slot mismatch : %+v != %+v", slots[0], appointment.Slots[1])
 		t.FailNow()
 	}

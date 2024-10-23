@@ -39,6 +39,16 @@ func (r IntervalRRule) GetIntervals() Intervals {
 	}
 }
 
+type IntervalsProducers []IntervalsProducer
+
+func (p IntervalsProducers) GetIntervals() Intervals {
+	var intervals Intervals
+	for _, u := range p {
+		intervals = append(intervals, u.GetIntervals()...)
+	}
+	return intervals
+}
+
 type IntervalSetBuilder struct {
 	UnionGetters     []IntervalsProducer
 	ExclusionGetters []IntervalsProducer

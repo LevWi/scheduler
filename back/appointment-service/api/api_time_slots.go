@@ -83,7 +83,7 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 		response.Slots = append(response.Slots, swagger.Slot{
 			ClientId: string(slot.Client),
 			TpStart:  slot.Start,
-			Len:      int32(slot.Len),
+			Len:      int32(slot.End.Sub(slot.Start).Minutes()),
 		})
 	}
 
@@ -146,16 +146,18 @@ func SlotsBusinessIdPost(s *storage.Storage, w http.ResponseWriter, r *http.Requ
 	tpEnd := jsonSlots[0].TpStart
 	appointment := common.Appointment{Business: businessID, Slots: make([]common.Slot, 0, len(jsonSlots))}
 	for i := 1; i < len(jsonSlots); i++ {
+		end := jsonSlots[i].TpStart.Add(time.Duration(jsonSlots[i].Len) * time.Minute)
 		appointment.Slots = append(appointment.Slots, common.Slot{
 			Client: jsonSlots[i].ClientId,
-			Start:  jsonSlots[i].TpStart,
-			Len:    int(jsonSlots[i].Len),
+			Interval: common.Interval{
+				Start: jsonSlots[i].TpStart,
+				End:   end},
 		})
 		if tpStart.Compare(jsonSlots[i].TpStart) == 1 {
 			tpStart = jsonSlots[i].TpStart
 		}
-		if tpEnd.Compare(jsonSlots[i].TpStart) == -1 {
-			tpEnd = jsonSlots[i].TpStart
+		if tpEnd.Compare(end) == -1 {
+			tpEnd = end
 		}
 	}
 
