@@ -12,6 +12,8 @@ type Interval struct {
 
 type Intervals []Interval
 
+type SliceIndex = int
+
 func (i Interval) IsValid() bool {
 	return i.Start.Before(i.End)
 }
@@ -63,4 +65,37 @@ func (intervals Intervals) IsOverlap(other Interval) bool {
 		}
 	}
 	return false
+}
+
+func (intervals Intervals) FirstOverlapped(other Interval) SliceIndex {
+	for i := 0; i < len(intervals); i++ {
+		if intervals[i].IsOverlap(other) {
+			return i
+		}
+	}
+	return -1
+}
+
+func (intervals Intervals) Copy() Intervals {
+	out := make(Intervals, len(intervals))
+	copy(out, intervals)
+	return out
+}
+
+func (intervals *Intervals) Unite() {
+	*intervals = unions(*intervals)
+}
+
+func unions(intervals Intervals) Intervals {
+	i, j := 0, 1
+	for ; j < len(intervals); j++ {
+		if intervals[i].IsOverlap(intervals[j]) {
+			if intervals[i].End.Compare(intervals[j].End) < 0 {
+				intervals[i].End = intervals[j].End
+			}
+		} else {
+			i++
+		}
+	}
+	return intervals[: len(intervals)-i : cap(intervals)]
 }

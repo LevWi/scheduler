@@ -3,16 +3,16 @@ package common
 import "errors"
 
 type IntervalSet struct {
-	Union     Intervals
+	Intervals Intervals
 	Exclusion Intervals
 }
 
 func (s *IntervalSet) IsValid() bool {
-	if !s.Union.IsSorted() {
+	if !s.Intervals.IsSorted() {
 		return false
 	}
 
-	if s.Union.HasOverlaps() {
+	if s.Intervals.HasOverlaps() {
 		return false
 	}
 
@@ -25,9 +25,9 @@ func (s *IntervalSet) IsValid() bool {
 
 func NewIntervalSetWithCopies(union Intervals, exclusion Intervals) (IntervalSet, error) {
 	tmp := IntervalSet{}
-	tmp.Union = make(Intervals, len(union))
+	tmp.Intervals = make(Intervals, len(union))
 	tmp.Exclusion = make(Intervals, len(exclusion))
-	copy(tmp.Union, union)
+	copy(tmp.Intervals, union)
 	copy(tmp.Exclusion, exclusion)
 	err := tmp.PreparePayload()
 	if err != nil {
@@ -37,8 +37,8 @@ func NewIntervalSetWithCopies(union Intervals, exclusion Intervals) (IntervalSet
 }
 
 func (s *IntervalSet) PreparePayload() error {
-	s.Union.SortByStart()
-	if s.Union.HasOverlaps() {
+	s.Intervals.SortByStart()
+	if s.Intervals.HasOverlaps() {
 		return errors.New("bad union")
 	}
 	s.Exclusion.SortByStart()
@@ -46,7 +46,7 @@ func (s *IntervalSet) PreparePayload() error {
 }
 
 func (s *IntervalSet) IsFit(other Interval) bool {
-	return s.Union.IsFit(other) && !s.Exclusion.IsOverlap(other)
+	return s.Intervals.IsFit(other) && !s.Exclusion.IsOverlap(other)
 }
 
 func (s *IntervalSet) AddExclusion(other Interval) {
@@ -54,11 +54,11 @@ func (s *IntervalSet) AddExclusion(other Interval) {
 	s.Exclusion.SortByStart()
 }
 
-func (s *IntervalSet) AddUnion(other Interval) error {
-	if s.Union.IsOverlap(other) {
+func (s *IntervalSet) Add(other Interval) error {
+	if s.Intervals.IsOverlap(other) {
 		return errors.New("overlap detected")
 	}
-	s.Union = append(s.Union, other)
-	s.Union.SortByStart()
+	s.Intervals = append(s.Intervals, other)
+	s.Intervals.SortByStart()
 	return nil
 }
