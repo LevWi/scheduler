@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-func TestIntervals(t *testing.T) {
-	start := time.Now()
+func TestInterval(t *testing.T) {
+	start := time.Date(2020, 1, 1, 10, 0, 0, 0, time.UTC)
 	interval := Interval{Start: start, End: start.Add(time.Hour)}
 
 	if !interval.IsOverlap(interval) {
@@ -57,6 +57,50 @@ func TestIntervals(t *testing.T) {
 	interval2.End = interval.End.Add(-1 * time.Second)
 	if !interval.IsOverlap(interval2) {
 		t.Fatalf("intervals is not overlapping %v %v", interval, interval2)
+	}
+
+	interval = Interval{Start: start, End: start.Add(time.Hour)}
+	result := interval.Subtract(interval)
+	if result != nil {
+		t.Fatalf("result should be nil %v", result)
+	}
+
+	interval2 = Interval{Start: start.Add(30 * time.Minute), End: start.Add(time.Hour)}
+	expected := Interval{Start: start, End: start.Add(30 * time.Minute)}
+	result = interval.Subtract(interval2)
+	if len(result) != 1 || result[0] != expected {
+		t.Fatalf("result should be %v but got %v", expected, result)
+	}
+
+	interval2 = Interval{Start: start.Add(31 * time.Minute), End: start.Add(time.Hour + time.Minute)}
+	expected = Interval{Start: start, End: start.Add(31 * time.Minute)}
+	result = interval.Subtract(interval2)
+	if len(result) != 1 || result[0] != expected {
+		t.Fatalf("result should be %v but got %v", expected, result)
+	}
+
+	interval2 = Interval{Start: start, End: start.Add(30 * time.Minute)}
+	expected = Interval{Start: start.Add(30 * time.Minute), End: start.Add(time.Hour)}
+	result = interval.Subtract(interval2)
+	if len(result) != 1 || result[0] != expected {
+		t.Fatalf("result should be %v but got %v", expected, result)
+	}
+
+	interval2 = Interval{Start: start.Add(-1 * time.Minute), End: start.Add(31 * time.Minute)}
+	expected = Interval{Start: start.Add(31 * time.Minute), End: start.Add(time.Hour)}
+	result = interval.Subtract(interval2)
+	if len(result) != 1 || result[0] != expected {
+		t.Fatalf("result should be %v but got %v", expected, result)
+	}
+
+	interval2 = Interval{Start: start.Add(10 * time.Minute), End: start.Add(time.Hour - 10*time.Minute)}
+	expected2 := Intervals{
+		{Start: start, End: start.Add(10 * time.Minute)},
+		{Start: start.Add(time.Hour - 10*time.Minute), End: start.Add(time.Hour)},
+	}
+	result = interval.Subtract(interval2)
+	if len(result) != 2 || result[0] != expected2[0] || result[1] != expected2[1] {
+		t.Fatalf("result should be %v but got %v", expected2, result)
 	}
 }
 

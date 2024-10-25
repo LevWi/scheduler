@@ -26,6 +26,30 @@ func (i Interval) IsFit(other Interval) bool {
 	return i.Start.Compare(other.Start) <= 0 && i.End.Compare(other.End) >= 0
 }
 
+func (i Interval) Subtract(other Interval) Intervals {
+	if !i.IsOverlap(other) {
+		return Intervals{i}
+	}
+
+	if other.IsFit(i) {
+		return nil
+	}
+
+	if i.Start.Before(other.Start) {
+		// right hand crossing
+		if i.End.Compare(other.End) <= 0 {
+			return Intervals{{Start: i.Start, End: other.Start}}
+		}
+		// middle crossing
+		return Intervals{
+			{Start: i.Start, End: other.Start},
+			{Start: other.End, End: i.End},
+		}
+	}
+	// left hand crossing
+	return Intervals{{Start: other.End, End: i.End}}
+}
+
 func intervalCompare(a, b Interval) int {
 	return a.Start.Compare(b.Start)
 }
@@ -82,6 +106,7 @@ func (intervals Intervals) Copy() Intervals {
 	return out
 }
 
+// Note: Expected sorted slice
 func (intervals *Intervals) Unite() {
 	*intervals = unions(*intervals)
 }
