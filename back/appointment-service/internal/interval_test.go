@@ -1,6 +1,7 @@
 package common
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -188,4 +189,151 @@ func TestIntervalSetSlices(t *testing.T) {
 	if set.IsFit(invalidInterval) {
 		t.Fatalf("interval should not fit %v", invalidInterval)
 	}
+}
+
+func TestSetPassedIntervals(t *testing.T) {
+	type Expected = Intervals
+	checkCase := func(i Intervals, e Intervals, expected Expected) {
+		set, err := NewIntervalSetWithCopies(i, e)
+		if err != nil {
+			t.Fatal("unexpected error", set)
+		}
+		if !set.IsValid() {
+			t.Fatalf("set should be valid %v", set)
+		}
+
+		result := set.PassedIntervals()
+		if !slices.Equal(result, expected) {
+			t.Fatalf("expected %v, got %v", expected, result)
+		}
+	}
+
+	checkCase(
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC)},
+		},
+
+		Expected{
+			{
+				time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC),
+			}, {
+				time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+	)
+
+	checkCase(
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+
+		Expected{
+			{
+				Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				End:   time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	)
+
+	checkCase(
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 8, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+
+		Expected{},
+	)
+
+	checkCase(
+		Intervals{},
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 8, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+		},
+
+		Expected{},
+	)
+
+	checkCase(
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+
+			{
+				time.Date(2024, 10, 9, 20, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 21, 0, 0, 0, time.UTC),
+			},
+		},
+		Intervals{
+			{
+				time.Date(2024, 10, 9, 10, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 11, 0, 0, 0, time.UTC),
+			},
+
+			{
+				time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 14, 0, 0, 0, time.UTC),
+			},
+
+			{
+				time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 16, 0, 0, 0, time.UTC),
+			},
+		},
+
+		Expected{
+			{
+				time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 10, 0, 0, 0, time.UTC),
+			},
+			{
+				time.Date(2024, 10, 9, 11, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC),
+			},
+			{
+				time.Date(2024, 10, 9, 14, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC),
+			},
+			{
+				time.Date(2024, 10, 9, 16, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC),
+			},
+			{
+				time.Date(2024, 10, 9, 20, 0, 0, 0, time.UTC),
+				time.Date(2024, 10, 9, 21, 0, 0, 0, time.UTC),
+			},
+		},
+	)
+
 }

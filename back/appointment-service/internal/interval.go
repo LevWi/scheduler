@@ -22,6 +22,10 @@ func (i Interval) IsOverlap(other Interval) bool {
 	return i.Start.Before(other.End) && i.End.After(other.Start)
 }
 
+func (i Interval) Before(other Interval) bool {
+	return i.End.Compare(other.Start) <= 0
+}
+
 func (i Interval) IsFit(other Interval) bool {
 	return i.Start.Compare(other.Start) <= 0 && i.End.Compare(other.End) >= 0
 }
