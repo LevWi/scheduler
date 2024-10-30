@@ -145,64 +145,10 @@ func TestIntervalSlices(t *testing.T) {
 	}
 }
 
-func TestIntervalSetSlices(t *testing.T) {
-	start := time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC)
-	end := time.Date(2024, 10, 9, 18, 0, 0, 0, time.UTC)
-
-	intervals := Intervals{Interval{start, end}}
-
-	if intervals.HasOverlaps() {
-		t.Fatalf("intervals should not has overlap %v", intervals)
-	}
-
-	set, err := NewIntervalSetWithCopies(intervals, nil)
-	if err != nil {
-		t.Fatal("unexpected error", set)
-	}
-
-	if !set.IsValid() {
-		t.Fatalf("set should be valid %v", set)
-	}
-
-	set.AddExclusion(Interval{start.Add(3 * time.Hour), start.Add(4 * time.Hour)})
-	if !set.IsValid() {
-		t.Fatalf("set should be valid %v", set)
-	}
-
-	validInterval := Interval{start.Add(1 * time.Hour), start.Add(1*time.Hour + 30*time.Minute)}
-	if !set.IsFit(validInterval) {
-		t.Fatalf("interval should fit %v", validInterval)
-	}
-
-	invalidInterval := Interval{start.Add(1 * time.Hour), start.Add(4*time.Hour + 30*time.Minute)}
-	if set.IsFit(invalidInterval) {
-		t.Fatalf("interval should not fit %v", invalidInterval)
-	}
-
-	validInterval = Interval{start.Add(2 * time.Hour), start.Add(3 * time.Hour)}
-	if !set.IsFit(validInterval) {
-		t.Fatalf("interval should fit %v", validInterval)
-	}
-
-	invalidInterval = validInterval
-	invalidInterval.End = invalidInterval.End.Add(1 * time.Minute)
-	if set.IsFit(invalidInterval) {
-		t.Fatalf("interval should not fit %v", invalidInterval)
-	}
-}
-
 func TestSetPassedIntervals(t *testing.T) {
 	type Expected = Intervals
 	checkCase := func(i Intervals, e Intervals, expected Expected) {
-		set, err := NewIntervalSetWithCopies(i, e)
-		if err != nil {
-			t.Fatal("unexpected error", set)
-		}
-		if !set.IsValid() {
-			t.Fatalf("set should be valid %v", set)
-		}
-
-		result := set.PassedIntervals()
+		result := i.PassedIntervals(e)
 		if !slices.Equal(result, expected) {
 			t.Fatalf("expected %v, got %v", expected, result)
 		}
