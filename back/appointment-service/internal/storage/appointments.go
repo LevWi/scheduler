@@ -21,6 +21,14 @@ type dbSlot struct {
 	DateEnd   int64  `db:"date_end"`
 }
 
+func (slot dbSlot) ToSlot() common.Slot {
+	return common.Slot{Client: slot.Client,
+		Interval: common.Interval{
+			Start: time.Unix(slot.DateStart, 0),
+			End:   time.Unix(slot.DateEnd, 0),
+		}}
+}
+
 type DBRule = string
 
 type DbBusinessRule struct {
@@ -70,6 +78,7 @@ func (db *Storage) GetBusinessRules(business_id common.ID) ([]DbBusinessRule, er
 	return rules, nil
 }
 
+// TODO check that rule valid ?
 func (db *Storage) AddBusinessRule(business_id common.ID, rule DBRule) error {
 	// Expected small count of rules for each business
 	var ids []int
@@ -106,26 +115,37 @@ func (db *Storage) DeleteBusinessRule(business_id common.ID, id int) error {
 	return err
 }
 
-// func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, start time.Time, end time.Time) ([]common.Slot, error) {
-// 	panic("Not implemented")
-// }
+// TODO replace common.Slot to another type?
+func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, between common.Interval) (common.Intervals, error) {
+	var rules []DBRule
+	err := db.Select(&rules, "SELECT rule FROM business_work_rule WHERE business_id = $1", string(business_id))
+	if err != nil {
+		return nil, err
+	}
 
-func (db *Storage) GetBusySlotsInRange(business_id common.ID, start time.Time, end time.Time) ([]common.Slot, error) {
+	intervalsRRules, err := common.ConvertToIntervalRRuleWithType(rules)
+	if err != nil {
+		return nil, err
+	}
+
+	intervals := common.CalculateIntervals(intervalsRRules)
+	intervals = intervals.UnitedBetween(between)
+
+	// TODO apply GetBusySlotsInRange result
+	return intervals, nil
+}
+
+func (db *Storage) GetBusySlotsInRange(business_id common.ID, between common.Interval) ([]common.Slot, error) {
 	var dbSlots []dbSlot
 	err := db.Select(&dbSlots, "SELECT * FROM appointments WHERE business_id = $1 AND date_start BETWEEN $2 AND $3",
-		string(business_id), start.Unix(), end.Unix())
+		string(business_id), between.Start.Unix(), between.End.Unix())
 	if err != nil {
 		return nil, err
 	}
 
 	var slotsOut []common.Slot
-	for _, slot := range dbSlots {
-		slotsOut = append(slotsOut,
-			common.Slot{Client: slot.Client,
-				Interval: common.Interval{
-					Start: time.Unix(slot.DateStart, 0),
-					End:   time.Unix(slot.DateEnd, 0),
-				}})
+	for _, dbSlot := range dbSlots {
+		slotsOut = append(slotsOut, dbSlot.ToSlot())
 	}
 	return slotsOut, nil
 }

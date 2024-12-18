@@ -135,6 +135,14 @@ func PrepareUnited(intervals Intervals) Intervals {
 	return intervals
 }
 
+func (intervals Intervals) UnitedBetween(restriction Interval) Intervals {
+	if len(intervals) == 0 || !restriction.IsValid() {
+		return Intervals{}
+	}
+
+	//TODO
+}
+
 func (intervals Intervals) PassedIntervals(exclusions Intervals) Intervals {
 	if len(intervals) == 0 {
 		return Intervals{}

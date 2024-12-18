@@ -1,15 +1,15 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/teambition/rrule-go"
 )
 
-func TestIntervalRRuleMarshalStorage(t *testing.T) {
+func getRule(t *testing.T) IntervalRRule {
 	const rruleStr = "DTSTART=20060101T150405Z;FREQ=DAILY;COUNT=5"
-
 	var rule IntervalRRule
 	{
 		r, e := rrule.StrToRRule(rruleStr)
@@ -19,7 +19,11 @@ func TestIntervalRRuleMarshalStorage(t *testing.T) {
 		rule.RRule = r
 		rule.Len = 5
 	}
+	return rule
+}
 
+func TestIntervalRRuleMarshal(t *testing.T) {
+	rule := getRule(t)
 	ruleJson, err := rule.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -43,4 +47,29 @@ func TestIntervalRRuleMarshalStorage(t *testing.T) {
 			t.FailNow()
 		}
 	}
+
+}
+
+func TestIntervalRRuleWithTypeMarshal(t *testing.T) {
+	rule := getRule(t)
+	in := IntervalRRuleWithType{Rule: rule, Type: Exclusion}
+	out, err := json.Marshal(IntervalRRuleWithType{Rule: rule, Type: Exclusion})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jsonStrings := []string{string(out)}
+	out2, err := ConvertToIntervalRRuleWithType(jsonStrings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if in.Rule.RRule.String() == out2[0].Rule.RRule.String() ||
+		in.Type != out2[0].Type ||
+		in.Rule.Len != out2[0].Rule.Len {
+		fmt.Printf("%v != %v\n", in, out2)
+		t.FailNow()
+	}
+
+	fmt.Printf("%v", out2)
 }

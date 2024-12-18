@@ -54,8 +54,52 @@ func (r *IntervalRRule) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-
 	r.RRule = rule
 	r.Len = Seconds(tmp.Len)
 	return nil
+}
+
+type IntervalType int
+
+const (
+	Inclusion IntervalType = iota
+	Exclusion
+)
+
+type IntervalRRuleWithType struct {
+	Rule IntervalRRule
+	Type IntervalType
+}
+
+func CalculateIntervals(in []IntervalRRuleWithType) Intervals {
+	var inclusion Intervals
+	var exclusion Intervals
+
+	for _, el := range in {
+		if el.Type == Exclusion {
+			exclusion = append(exclusion, el.Rule.GetIntervals()...)
+		} else if el.Type == Inclusion {
+			inclusion = append(inclusion, el.Rule.GetIntervals()...)
+		} else {
+			panic("Unexpected value")
+		}
+	}
+
+	PrepareUnited(inclusion)
+	PrepareUnited(exclusion)
+
+	return inclusion.PassedIntervals(exclusion)
+}
+
+func ConvertToIntervalRRuleWithType(jsonStrings []string) ([]IntervalRRuleWithType, error) {
+	var intervalsRRules []IntervalRRuleWithType
+	for _, el := range jsonStrings {
+		var tmp IntervalRRuleWithType
+		err := json.Unmarshal([]byte(el), &tmp)
+		if err != nil {
+			return nil, err
+		}
+		intervalsRRules = append(intervalsRRules, tmp)
+	}
+	return intervalsRRules, nil
 }
