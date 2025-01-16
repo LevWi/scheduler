@@ -26,6 +26,10 @@ func initDB(t *testing.T) Storage {
 	return Storage{DB: db}
 }
 
+func toInterval(start time.Time, end time.Time) types.Interval {
+	return types.Interval{Start: start, End: end}
+}
+
 func TestStorage(t *testing.T) {
 	storage := initDB(t)
 	defer storage.Close()
@@ -57,7 +61,7 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slots, err := storage.GetBusySlotsInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	slots, err := storage.GetBusySlotsInRange(appointment.Business, toInterval(appointment.Slots[0].Start, appointment.Slots[1].Start))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +79,7 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slots, err = storage.GetBusySlotsInRange(appointment.Business, appointment.Slots[0].Start, appointment.Slots[1].Start)
+	slots, err = storage.GetBusySlotsInRange(appointment.Business, toInterval(appointment.Slots[0].Start, appointment.Slots[1].Start))
 	if err != nil {
 		t.Fatal(err)
 	}

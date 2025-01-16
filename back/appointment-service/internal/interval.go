@@ -18,6 +18,10 @@ func (i Interval) IsValid() bool {
 	return i.Start.Before(i.End)
 }
 
+func (i Interval) IsEmpty() bool {
+	return i == Interval{}
+}
+
 func (i Interval) IsOverlap(other Interval) bool {
 	return i.Start.Before(other.End) && i.End.After(other.Start)
 }
@@ -52,6 +56,17 @@ func (i Interval) Subtract(other Interval) Intervals {
 	}
 	// left hand crossing
 	return Intervals{{Start: other.End, End: i.End}}
+}
+
+func (i Interval) Intersection(other Interval) Interval {
+	out := other
+	if i.Start.After(other.Start) {
+		out.Start = i.Start
+	}
+	if i.End.Before(other.End) {
+		out.End = i.End
+	}
+	return out
 }
 
 func intervalCompare(a, b Interval) int {
@@ -135,12 +150,20 @@ func PrepareUnited(intervals Intervals) Intervals {
 	return intervals
 }
 
+// TODO add test
 func (intervals Intervals) UnitedBetween(restriction Interval) Intervals {
 	if len(intervals) == 0 || !restriction.IsValid() {
 		return Intervals{}
 	}
 
-	//TODO
+	out := make(Intervals, 0, len(intervals))
+	for _, el := range intervals {
+		el = el.Intersection(restriction)
+		if el.IsValid() {
+			out = append(out, el)
+		}
+	}
+	return out
 }
 
 func (intervals Intervals) PassedIntervals(exclusions Intervals) Intervals {

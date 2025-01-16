@@ -115,7 +115,7 @@ func (db *Storage) DeleteBusinessRule(business_id common.ID, id int) error {
 	return err
 }
 
-// TODO replace common.Slot to another type?
+// TODO add test
 func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, between common.Interval) (common.Intervals, error) {
 	var rules []DBRule
 	err := db.Select(&rules, "SELECT rule FROM business_work_rule WHERE business_id = $1", string(business_id))
@@ -128,10 +128,24 @@ func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, between commo
 		return nil, err
 	}
 
+	// TODO Not optimal
 	intervals := common.CalculateIntervals(intervalsRRules)
 	intervals = intervals.UnitedBetween(between)
+	if len(intervals) == 0 {
+		return nil, nil
+	}
 
-	// TODO apply GetBusySlotsInRange result
+	slots, err := db.GetBusySlotsInRange(business_id, between)
+	if err != nil {
+		return nil, err
+	}
+
+	var exclusions common.Intervals
+	for _, slot := range slots {
+		exclusions = append(exclusions, slot.Interval)
+	}
+
+	intervals = intervals.PassedIntervals(exclusions)
 	return intervals, nil
 }
 
