@@ -170,12 +170,17 @@ func (db *Storage) DeleteSlots(business_id common.ID, client_id common.ID, start
 	return err
 }
 
-// TODO check intersections in range
+type AddSlotsData struct {
+	Business common.ID
+	Client   common.ID
+	Slots    common.Intervals
+}
 
-func (db *Storage) AddSlots(appointment common.Appointment) error {
-	dbSlots := make([]dbSlot, 0, len(appointment.Slots))
-	for _, slot := range appointment.Slots {
-		dbSlots = append(dbSlots, dbSlot{Client: slot.Client, Business: appointment.Business, DateStart: slot.Interval.Start.Unix(), DateEnd: slot.Interval.End.Unix()})
+// expected that no intersections in range
+func (db *Storage) AddSlots(in AddSlotsData) error {
+	dbSlots := make([]dbSlot, 0, len(in.Slots))
+	for _, slot := range in.Slots {
+		dbSlots = append(dbSlots, dbSlot{Client: in.Client, Business: in.Business, DateStart: slot.Start.Unix(), DateEnd: slot.End.Unix()})
 	}
 	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_start, client_id, date_end) VALUES (:business_id, :date_start, :client_id, :date_end)", dbSlots)
 	return err
