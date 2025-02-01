@@ -16,13 +16,13 @@ paths:
             type: string
           example: "550e8400-e29b-41d4-a716-446655440000"
         - name: date_start
-          in: header
+          in: query
           required: true
           schema:
             type: string
             format: date
         - name: date_end
-          in: header
+          in: query
           required: true
           schema:
             type: string
@@ -55,9 +55,7 @@ paths:
         content:
           'application/json':
             schema:
-              type: array
-              items: 
-                $ref: '#/components/schemas/Slot'
+                $ref: '#/components/schemas/SlotsRequest'
       responses:
         '200':
           description: Successful operation
@@ -76,6 +74,22 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
+    Slot:
+      properties:
+        tp_start:
+          type: string
+          format: date-time
+        len:
+          type: integer
+    SlotsRequest:
+      properties:
+        client_id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        slots:
+            type: array
+            items:
+                  $ref: '#/components/schemas/Slot'
     AvailableSlots:
       properties:
         query_id:
@@ -85,16 +99,6 @@ components:
           type: array
           items:
                 $ref: '#/components/schemas/Slot'
-    Slot:
-      properties:
-        client_id:
-          type: string
-          example: "550e8400-e29b-41d4-a716-446655440000"
-        tp_start:
-          type: string
-          format: date-time
-        len:
-          type: integer
     Error:
       properties:
         query_id:
@@ -104,7 +108,4 @@ components:
           type: string
         code:
           type: integer
-        
-        
-       
-    
+  

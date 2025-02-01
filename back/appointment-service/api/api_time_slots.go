@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	swagger "scheduler/appointment-service/api/types"
@@ -18,8 +19,8 @@ func parseTime(s string) (time.Time, error) {
 	return time.Parse(time.RFC3339, s)
 }
 
-func getTimeFromHeader(key string, h http.Header) (time.Time, error) {
-	dtStr := h.Get(key)
+func getTimeFromURL(key string, v url.Values) (time.Time, error) {
+	dtStr := v.Get(key)
 	if dtStr == "" {
 		return time.Time{}, fmt.Errorf("%s not found", key)
 	}
@@ -47,7 +48,6 @@ func SlotsBusinessIdPostFunc(s *storage.Storage) http.HandlerFunc {
 // TODO prepare error, prepare QueryId
 func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
 	vars := mux.Vars(r)
 	businessID := vars["business_id"]
 	if businessID == "" {
@@ -56,20 +56,13 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	clientID := vars["client_id"]
-	if clientID == "" {
-		slog.WarnContext(r.Context(), "client_id not found")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	dateStart, err := getTimeFromHeader("date_start", r.Header)
+	dateStart, err := getTimeFromURL("date_start", r.URL.Query())
 	if err != nil {
 		slog.WarnContext(r.Context(), err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	dateEnd, err := getTimeFromHeader("date_end", r.Header)
+	dateEnd, err := getTimeFromURL("date_end", r.URL.Query())
 	if err != nil {
 		slog.WarnContext(r.Context(), err.Error())
 		w.WriteHeader(http.StatusBadRequest)
@@ -88,9 +81,8 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 
 	for _, slot := range slots {
 		response.Slots = append(response.Slots, swagger.Slot{
-			ClientId: string(slot.Client),
-			TpStart:  slot.Start,
-			Len:      int32(slot.End.Sub(slot.Start).Minutes()),
+			TpStart: slot.Start,
+			Len:     int32(slot.End.Sub(slot.Start).Minutes()),
 		})
 	}
 

@@ -8,12 +8,9 @@
  */
 package swagger
 
-import (
-	"time"
-)
+type SlotsRequest struct {
 
-type Slot struct {
-	TpStart time.Time `json:"tp_start,omitempty"`
+	ClientId string `json:"client_id,omitempty"`
 
-	Len int32 `json:"len,omitempty"`
+	Slots []Slot `json:"slots,omitempty"`
 }
