@@ -64,10 +64,10 @@ func TestIntervalRRuleWithTypeMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if in.Rule.RRule.String() == out2[0].Rule.RRule.String() ||
+	if in.Rule.RRule.String() != out2[0].Rule.RRule.String() ||
 		in.Type != out2[0].Type ||
 		in.Rule.Len != out2[0].Rule.Len {
-		fmt.Printf("%v != %v\n", in, out2)
+		fmt.Printf("%v != %v\n", in, out2[0])
 		t.FailNow()
 	}
 
