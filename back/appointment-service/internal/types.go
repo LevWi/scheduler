@@ -2,12 +2,12 @@ package common
 
 type ID = string
 
-type Slot struct {
+type BusySlot struct {
 	Client ID
 	Interval
 }
 
 type Appointment struct {
 	Business ID
-	Slots    []Slot
+	Slots    []BusySlot
 }

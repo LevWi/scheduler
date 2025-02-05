@@ -14,15 +14,15 @@ type Storage struct {
 	*sqlx.DB
 }
 
-type dbSlot struct {
+type dbBusySlot struct {
 	Client    string `db:"client_id"`
 	Business  string `db:"business_id"` // TODO use integer
 	DateStart int64  `db:"date_start"`
 	DateEnd   int64  `db:"date_end"`
 }
 
-func (slot dbSlot) ToSlot() common.Slot {
-	return common.Slot{Client: slot.Client,
+func (slot dbBusySlot) ToSlot() common.BusySlot {
+	return common.BusySlot{Client: slot.Client,
 		Interval: common.Interval{
 			Start: time.Unix(slot.DateStart, 0),
 			End:   time.Unix(slot.DateEnd, 0),
@@ -44,6 +44,7 @@ const queryCreateAppointmentsTable = `CREATE TABLE "appointments" (
 	UNIQUE (business_id, date_start)
 );`
 
+// TODO add exclude type rule
 const createBusinessTable = `CREATE TABLE "business_work_rule" (
 	"id" INTEGER NOT NULL,
 	"business_id" TEXT NOT NULL,
@@ -149,15 +150,15 @@ func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, between commo
 	return intervals, nil
 }
 
-func (db *Storage) GetBusySlotsInRange(business_id common.ID, between common.Interval) ([]common.Slot, error) {
-	var dbSlots []dbSlot
+func (db *Storage) GetBusySlotsInRange(business_id common.ID, between common.Interval) ([]common.BusySlot, error) {
+	var dbSlots []dbBusySlot
 	err := db.Select(&dbSlots, "SELECT * FROM appointments WHERE business_id = $1 AND date_start BETWEEN $2 AND $3",
 		string(business_id), between.Start.Unix(), between.End.Unix())
 	if err != nil {
 		return nil, err
 	}
 
-	var slotsOut []common.Slot
+	var slotsOut []common.BusySlot
 	for _, dbSlot := range dbSlots {
 		slotsOut = append(slotsOut, dbSlot.ToSlot())
 	}
@@ -178,9 +179,9 @@ type AddSlotsData struct {
 
 // expected that no intersections in range
 func (db *Storage) AddSlots(in AddSlotsData) error {
-	dbSlots := make([]dbSlot, 0, len(in.Slots))
+	dbSlots := make([]dbBusySlot, 0, len(in.Slots))
 	for _, slot := range in.Slots {
-		dbSlots = append(dbSlots, dbSlot{Client: in.Client, Business: in.Business, DateStart: slot.Start.Unix(), DateEnd: slot.End.Unix()})
+		dbSlots = append(dbSlots, dbBusySlot{Client: in.Client, Business: in.Business, DateStart: slot.Start.Unix(), DateEnd: slot.End.Unix()})
 	}
 	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_start, client_id, date_end) VALUES (:business_id, :date_start, :client_id, :date_end)", dbSlots)
 	return err

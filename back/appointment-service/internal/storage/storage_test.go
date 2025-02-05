@@ -39,47 +39,54 @@ func TestStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var appointment types.Appointment
+	var appointments []AddSlotsData
 	{
 		tm := time.Now().Truncate(time.Minute)
-		appointment = types.Appointment{
-			Business: "b1", Slots: []types.Slot{
-				{Client: "c1", Interval: types.Interval{Start: tm, End: tm.Add(30 * time.Minute)}},
-				{Client: "c2", Interval: types.Interval{Start: tm.Add(30 * time.Minute), End: tm.Add(60 * time.Minute)}},
-			},
+		appointments = append(appointments, AddSlotsData{
+			Business: "b1",
+			Client:   "c1",
+			Slots: []types.Interval{
+				{Start: tm, End: tm.Add(30 * time.Minute)}},
+		}, AddSlotsData{
+			Business: "b1",
+			Client:   "c2",
+			Slots: []types.Interval{
+				{Start: tm.Add(30 * time.Minute), End: tm.Add(60 * time.Minute)}},
+		})
+	}
+
+	for _, el := range appointments {
+		err = storage.AddSlots(el)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		//Check duplicates
+		err = storage.AddSlots(el)
+		if err == nil {
+			t.Fatal(err)
 		}
 	}
 
-	err = storage.AddSlots(appointment)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	//Check duplicates
-	err = storage.AddSlots(appointment)
-	if err == nil {
-		t.Fatal(err)
-	}
-
-	slots, err := storage.GetBusySlotsInRange(appointment.Business, toInterval(appointment.Slots[0].Start, appointment.Slots[1].Start))
+	slots, err := storage.GetBusySlotsInRange(appointments[0].Business, toInterval(appointments[0].Slots[0].Start, appointments[1].Slots[0].Start))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(slots)
 
 	for i, slot := range slots {
-		if appointment.Slots[i].Start != slot.Start || appointment.Slots[i].End != slot.End || appointment.Slots[i].Client != slot.Client {
-			fmt.Printf("slot mismatch : %+v != %+v", slot, appointment.Slots[i])
+		if appointments[i].Slots[0].Start != slot.Start || appointments[i].Slots[0].End != slot.End || appointments[i].Client != slot.Client {
+			fmt.Printf("slot mismatch : %+v != %+v", slot, appointments[i].Slots[0])
 			t.FailNow()
 		}
 	}
 
-	err = storage.DeleteSlots(appointment.Business, appointment.Slots[0].Client, appointment.Slots[0].Start, appointment.Slots[0].Start)
+	err = storage.DeleteSlots(appointments[0].Business, appointments[0].Client, appointments[0].Slots[0].Start, appointments[0].Slots[0].Start)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	slots, err = storage.GetBusySlotsInRange(appointment.Business, toInterval(appointment.Slots[0].Start, appointment.Slots[1].Start))
+	slots, err = storage.GetBusySlotsInRange(appointments[0].Business, toInterval(appointments[0].Slots[0].Start, appointments[1].Slots[0].Start))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,8 +95,8 @@ func TestStorage(t *testing.T) {
 		t.Fatal("expected 1 slot, got", len(slots))
 	}
 
-	if appointment.Slots[1].Start != slots[0].Start || appointment.Slots[1].End != slots[0].End || appointment.Slots[1].Client != slots[0].Client {
-		fmt.Printf("slot mismatch : %+v != %+v", slots[0], appointment.Slots[1])
+	if appointments[1].Slots[0].Start != slots[0].Start || appointments[1].Slots[0].End != slots[0].End || appointments[1].Client != slots[0].Client {
+		fmt.Printf("slot mismatch : %+v != %+v", slots, appointments[1])
 		t.FailNow()
 	}
 }
