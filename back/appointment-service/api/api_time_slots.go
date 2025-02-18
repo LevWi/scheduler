@@ -118,7 +118,7 @@ func SlotsBusinessIdPost(s *storage.Storage, w http.ResponseWriter, r *http.Requ
 	err := json.NewDecoder(r.Body).Decode(&jsonSlots)
 	if err != nil {
 		slog.WarnContext(r.Context(), err.Error())
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest) //TODO Use http.Error()?
 		return
 	}
 

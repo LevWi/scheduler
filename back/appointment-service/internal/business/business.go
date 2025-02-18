@@ -12,7 +12,7 @@ type BusinessMeta struct {
 }
 
 type SlotProducer interface {
-	GetSlots() []common.Slot
+	GetSlots() []common.Interval
 }
 
 type Business struct {
