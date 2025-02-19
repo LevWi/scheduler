@@ -47,7 +47,7 @@ func loginHandler(store sessions.Store, uc UserChecker, h HttpIO) {
 
 	session, err := store.Get(h.Req, "sid")
 	if err != nil {
-		slog.ErrorContext(h.Req.Context(), "sessions", "err", err.Error())
+		slog.WarnContext(h.Req.Context(), "sessions", "err", err.Error())
 	}
 
 	session.Values["uid"] = uid
