@@ -10,7 +10,7 @@ include(GNUInstallDirs)
 
 add_library(base INTERFACE IMPORTED)
 add_library(lf::base ALIAS base)
-target_compile_features(base INTERFACE cxx_std_20)
+target_compile_features(base INTERFACE cxx_std_23)
 
 
 add_library(core OBJECT)

@@ -41,7 +41,7 @@ TEST(IntervalTest, BasicOperations) {
   EXPECT_TRUE(interval.is_overlap(interval2));
 }
 
-TEST(IntervalTest, SubtractTest) {
+TEST(IntervalTest, Subtract) {
   TimePoint start = kStartPoint;
 
   Interval interval{start, start + 1h};
@@ -81,7 +81,133 @@ TEST(IntervalTest, SubtractTest) {
   EXPECT_EQ(result[1], expected2[1]);
 }
 
-int main(int argc, char **argv) {
+TEST(IntervalTest, SortingAndOverlap) {
+  Interval interval{kStartPoint, kStartPoint + 1min};
+
+  Intervals intervals = {interval, interval};
+  sort_by_start(intervals);
+  EXPECT_TRUE(is_sorted(intervals));
+  EXPECT_TRUE(has_overlaps(intervals));
+
+  intervals.clear();
+  for (int i = 0; i < 10; ++i) {
+    auto tp = kStartPoint + i * 1min;
+    intervals.push_back({tp, tp + 1min});
+  }
+  sort_by_start(intervals);
+  EXPECT_TRUE(is_sorted(intervals));
+  EXPECT_FALSE(has_overlaps(intervals));
+
+  intervals.push_back(intervals[0]);
+  EXPECT_FALSE(is_sorted(intervals));
+  sort_by_start(intervals);
+  EXPECT_TRUE(is_sorted(intervals));
+  EXPECT_TRUE(has_overlaps(intervals));
+}
+
+TEST(IntervalsTest, TestSetPassedIntervals) {
+  auto checkCase = [](const Intervals& i, const Intervals& e,
+                      const Intervals& expected) {
+    auto result = passed_intervals(i, e);
+    EXPECT_TRUE(std::ranges::equal(result, expected))
+        << "Expected: " << expected.size()
+        << " intervals, got: " << result.size();
+  };
+
+  // 157
+  checkCase({{{sys_days{2024y / October / 9} + 9h},
+              {sys_days{2024y / October / 9} + 18h}}},
+            {{{sys_days{2024y / October / 9} + 12h},
+              {sys_days{2024y / October / 9} + 13h}}},
+            {{{sys_days{2024y / October / 9} + 9h},
+              {sys_days{2024y / October / 9} + 12h}},
+             {{sys_days{2024y / October / 9} + 13h},
+              {sys_days{2024y / October / 9} + 18h}}});
+  // 181
+  checkCase({{{sys_days{2024y / October / 9} + 9h},
+              {sys_days{2024y / October / 9} + 18h}}},
+            {{{sys_days{2024y / October / 9} + 12h},
+              {sys_days{2024y / October / 9} + 18h}}},
+            {{{sys_days{2024y / October / 9} + 9h},
+              {sys_days{2024y / October / 9} + 12h}}});
+
+  // 203
+  checkCase(
+      {
+          {
+              {sys_days{2024y / October / 9} + 9h},
+              {sys_days{2024y / October / 9} + 18h},
+          },
+      },
+      {
+          {
+              {sys_days{2024y / October / 9} + 8h},
+              {sys_days{2024y / October / 9} + 18h},
+          },
+      },
+      Intervals{});
+
+  // 220
+  checkCase({},
+            {
+                {
+                    {sys_days{2024y / October / 9} + 8h},
+                    {sys_days{2024y / October / 9} + 18h},
+                },
+            },
+            {});
+
+  // 232
+  checkCase(
+      {
+          {
+              sys_days{2024y / October / 9} + 9h,
+              sys_days{2024y / October / 9} + 18h,
+          },
+          {
+              sys_days{2024y / October / 9} + 20h,
+              sys_days{2024y / October / 9} + 21h,
+          },
+      },
+      {
+          {
+              sys_days{2024y / October / 9} + 10h,
+              sys_days{2024y / October / 9} + 11h,
+          },
+          {
+              sys_days{2024y / October / 9} + 13h,
+              sys_days{2024y / October / 9} + 14h,
+          },
+          {
+              sys_days{2024y / October / 9} + 15h,
+              sys_days{2024y / October / 9} + 16h,
+          },
+      },
+      {
+          {
+              sys_days{2024y / October / 9} + 9h,
+              sys_days{2024y / October / 9} + 10h,
+          },
+          {
+              sys_days{2024y / October / 9} + 11h,
+              sys_days{2024y / October / 9} + 13h,
+          },
+          {
+              sys_days{2024y / October / 9} + 14h,
+              sys_days{2024y / October / 9} + 15h,
+          },
+          {
+              sys_days{2024y / October / 9} + 16h,
+              sys_days{2024y / October / 9} + 18h,
+          },
+          {
+              sys_days{2024y / October / 9} + 20h,
+              sys_days{2024y / October / 9} + 21h,
+          },
+      });
+}
+
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

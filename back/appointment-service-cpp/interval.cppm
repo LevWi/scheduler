@@ -15,6 +15,7 @@ concept isTimePoint =
 
 template <isTimePoint Tp>
 struct Interval {
+  using Timepoint = Tp;
   Tp start{};
   Tp end{};
 
@@ -32,7 +33,7 @@ struct Interval {
     return start <= other.start && end >= other.end;
   }
 
-  std::vector<Interval> subtract(const Interval &other) const {
+  std::vector<Interval> subtract(const Interval &other) const { //TODO avoid heap allocation?
     if (!is_overlap(other)) return {*this};
     if (other.is_fit(*this)) return {};
 
@@ -60,21 +61,27 @@ struct Interval {
 template <isTimePoint Tp>
 using Intervals = std::vector<Interval<Tp>>;
 
+template <isTimePoint Tp>
+bool intervals_compare(const Interval<Tp> &a, const Interval<Tp> &b) {
+  return a.start < b.start;
+};
+
 template <typename Tp>
 void sort_by_start(Intervals<Tp> &intervals) {
-  std::ranges::sort(intervals, [](const auto &a, const auto &b) {
-    return a.start < b.start;
-  });
+  std::ranges::sort(intervals, intervals_compare<Tp>);
+}
+
+template <typename Tp>
+bool is_sorted(const Intervals<Tp> &intervals) {
+  return std::ranges::is_sorted(intervals, intervals_compare<Tp>);
 }
 
 template <typename Tp>
 bool has_overlaps(const Intervals<Tp> &intervals) {
-  for (std::size_t i = 0; i < intervals.size() - 1; ++i) {
-    if (intervals[i].is_overlap(intervals[i + 1])) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::adjacent_find(intervals,
+                                    [](const auto &a, const auto &b) {
+                                      return a.is_overlap(b);
+                                    }) != intervals.end();
 }
 
 template <typename Tp>
@@ -98,6 +105,7 @@ Intervals<Tp> passed_intervals(const Intervals<Tp> &intervals,
   if (exclusions.empty()) return intervals;
 
   Intervals<Tp> out;
+  out.reserve(intervals.size());
   std::size_t exclusionIndex = 0;
   Interval<Tp> tmp{};
 
