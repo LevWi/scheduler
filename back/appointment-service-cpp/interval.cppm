@@ -33,7 +33,8 @@ struct Interval {
     return start <= other.start && end >= other.end;
   }
 
-  std::vector<Interval> subtract(const Interval &other) const { //TODO avoid heap allocation?
+  std::vector<Interval> subtract(
+      const Interval &other) const {  // TODO avoid heap allocation?
     if (!is_overlap(other)) return {*this};
     if (other.is_fit(*this)) return {};
 
@@ -85,17 +86,29 @@ bool has_overlaps(const Intervals<Tp> &intervals) {
 }
 
 template <typename Tp>
-Intervals<Tp> prepare_united(Intervals<Tp> intervals) {
+void prepare_united(Intervals<Tp> &intervals) {
+  if (intervals.size() < 2) {
+    return;
+  }
   sort_by_start(intervals);
-  Intervals<Tp> result;
-  for (const auto &interval : intervals) {
-    if (!result.empty() && result.back().is_overlap(interval)) {
-      result.back().end = std::max(result.back().end, interval.end);
+
+  auto i = intervals.begin();
+  bool united = false;
+  for (auto j = i + 1; j < intervals.end(); j++) {
+    if (i->is_overlap(*j)) {
+      if (i->end < j->end) {
+        i->end = j->end;
+      }
+      united = true;
+    } else if (united) {
+      i = intervals.erase(i + 1, j);
+      j = i;
+      united = false;
     } else {
-      result.push_back(interval);
+      i = j;
     }
   }
-  return result;
+  intervals.erase(i + 1, intervals.end());
 }
 
 template <typename Tp>

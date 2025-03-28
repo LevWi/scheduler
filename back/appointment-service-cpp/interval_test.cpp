@@ -105,6 +105,102 @@ TEST(IntervalTest, SortingAndOverlap) {
   EXPECT_TRUE(has_overlaps(intervals));
 }
 
+TimePoint make_time(TimePoint::duration seconds) {
+  return kStartPoint + seconds;
+}
+
+TEST(PrepareUnitedTests, MergesOverlappingIntervals) {
+  Intervals intervals = {{make_time(0min), make_time(10min)},
+                         {make_time(5min), make_time(15min)},
+                         {make_time(12min), make_time(20min)},
+                         {make_time(18min), make_time(25min)},
+                         {make_time(30min), make_time(40min)},
+                         {make_time(35min), make_time(50min)}};
+
+  prepare_united(intervals);
+
+  ASSERT_EQ(intervals.size(), 2);
+  EXPECT_EQ(intervals[0].start, make_time(0min));
+  EXPECT_EQ(intervals[0].end, make_time(25min));
+  EXPECT_EQ(intervals[1].start, make_time(30min));
+  EXPECT_EQ(intervals[1].end, make_time(50min));
+
+  intervals = {{make_time(0min), make_time(10min)},
+               {make_time(5min), make_time(15min)},
+               {make_time(15min), make_time(20min)}};
+
+  prepare_united(intervals);
+
+  ASSERT_EQ(intervals.size(), 2);
+  EXPECT_EQ(intervals[0].start, make_time(0min));
+  EXPECT_EQ(intervals[0].end, make_time(15min));
+  EXPECT_EQ(intervals[1].start, make_time(15min));
+  EXPECT_EQ(intervals[1].end, make_time(20min));
+}
+
+TEST(PrepareUnitedTests, KeepsNonOverlappingIntervals) {
+  Intervals intervals = {{make_time(0s), make_time(5s)},
+                         {make_time(10s), make_time(15s)},
+                         {make_time(20s), make_time(25s)},
+                         {make_time(30s), make_time(35s)},
+                         {make_time(40s), make_time(45s)}};
+
+  auto copy = intervals;
+  prepare_united(intervals);
+
+  ASSERT_EQ(intervals.size(), 5);  // No merging should occur
+  ASSERT_TRUE(std::ranges::equal(intervals, copy));
+
+  intervals = {
+      {make_time(0s), make_time(10s)},
+      {make_time(10s), make_time(20s)},
+      {make_time(20s), make_time(30s)},
+      {make_time(30s), make_time(40s)},
+  };
+
+  copy = intervals;
+  prepare_united(intervals);
+
+  ASSERT_EQ(intervals.size(), 4);
+  ASSERT_TRUE(std::ranges::equal(intervals, copy));
+}
+
+TEST(PrepareUnitedTests, RemainsUnchanged) {
+  Intervals intervals;
+  prepare_united(intervals);
+  ASSERT_TRUE(intervals.empty());
+
+  intervals = {{make_time(0s), make_time(10s)}};
+
+  prepare_united(intervals);
+
+  ASSERT_EQ(intervals.size(), 1);
+  EXPECT_EQ(intervals[0].start, make_time(0s));
+  EXPECT_EQ(intervals[0].end, make_time(10s));
+}
+
+TEST(PrepareUnitedTests, MixedMergingAndNonMerging) {
+  Intervals intervals = {
+      {make_time(0s), make_time(10s)},
+      {make_time(5s), make_time(12s)},  // Overlaps with first
+      {make_time(20s), make_time(25s)},
+      {make_time(30s), make_time(35s)},
+      {make_time(32s), make_time(40s)},  // Overlaps with previous
+      {make_time(40s), make_time(60s)}};
+
+  prepare_united(intervals);
+
+  ASSERT_EQ(intervals.size(), 4);
+  EXPECT_EQ(intervals[0].start, make_time(0s));
+  EXPECT_EQ(intervals[0].end, make_time(12s));
+  EXPECT_EQ(intervals[1].start, make_time(20s));
+  EXPECT_EQ(intervals[1].end, make_time(25s));
+  EXPECT_EQ(intervals[2].start, make_time(30s));
+  EXPECT_EQ(intervals[2].end, make_time(40s));
+  EXPECT_EQ(intervals[3].start, make_time(40s));
+  EXPECT_EQ(intervals[3].end, make_time(60s));
+}
+
 TEST(IntervalsTest, TestSetPassedIntervals) {
   auto checkCase = [](const Intervals& i, const Intervals& e,
                       const Intervals& expected) {
@@ -114,35 +210,29 @@ TEST(IntervalsTest, TestSetPassedIntervals) {
         << " intervals, got: " << result.size();
   };
 
+  const auto start_time = sys_days{2024y / October / 9};
   // 157
-  checkCase({{{sys_days{2024y / October / 9} + 9h},
-              {sys_days{2024y / October / 9} + 18h}}},
-            {{{sys_days{2024y / October / 9} + 12h},
-              {sys_days{2024y / October / 9} + 13h}}},
-            {{{sys_days{2024y / October / 9} + 9h},
-              {sys_days{2024y / October / 9} + 12h}},
-             {{sys_days{2024y / October / 9} + 13h},
-              {sys_days{2024y / October / 9} + 18h}}});
+  checkCase({{{start_time + 9h}, {start_time + 18h}}},
+            {{{start_time + 12h}, {start_time + 13h}}},
+            {{{start_time + 9h}, {start_time + 12h}},
+             {{start_time + 13h}, {start_time + 18h}}});
   // 181
-  checkCase({{{sys_days{2024y / October / 9} + 9h},
-              {sys_days{2024y / October / 9} + 18h}}},
-            {{{sys_days{2024y / October / 9} + 12h},
-              {sys_days{2024y / October / 9} + 18h}}},
-            {{{sys_days{2024y / October / 9} + 9h},
-              {sys_days{2024y / October / 9} + 12h}}});
+  checkCase({{{start_time + 9h}, {start_time + 18h}}},
+            {{{start_time + 12h}, {start_time + 18h}}},
+            {{{start_time + 9h}, {start_time + 12h}}});
 
   // 203
   checkCase(
       {
           {
-              {sys_days{2024y / October / 9} + 9h},
-              {sys_days{2024y / October / 9} + 18h},
+              {start_time + 9h},
+              {start_time + 18h},
           },
       },
       {
           {
-              {sys_days{2024y / October / 9} + 8h},
-              {sys_days{2024y / October / 9} + 18h},
+              {start_time + 8h},
+              {start_time + 18h},
           },
       },
       Intervals{});
@@ -151,8 +241,8 @@ TEST(IntervalsTest, TestSetPassedIntervals) {
   checkCase({},
             {
                 {
-                    {sys_days{2024y / October / 9} + 8h},
-                    {sys_days{2024y / October / 9} + 18h},
+                    {start_time + 8h},
+                    {start_time + 18h},
                 },
             },
             {});
@@ -161,48 +251,48 @@ TEST(IntervalsTest, TestSetPassedIntervals) {
   checkCase(
       {
           {
-              sys_days{2024y / October / 9} + 9h,
-              sys_days{2024y / October / 9} + 18h,
+              start_time + 9h,
+              start_time + 18h,
           },
           {
-              sys_days{2024y / October / 9} + 20h,
-              sys_days{2024y / October / 9} + 21h,
-          },
-      },
-      {
-          {
-              sys_days{2024y / October / 9} + 10h,
-              sys_days{2024y / October / 9} + 11h,
-          },
-          {
-              sys_days{2024y / October / 9} + 13h,
-              sys_days{2024y / October / 9} + 14h,
-          },
-          {
-              sys_days{2024y / October / 9} + 15h,
-              sys_days{2024y / October / 9} + 16h,
+              start_time + 20h,
+              start_time + 21h,
           },
       },
       {
           {
-              sys_days{2024y / October / 9} + 9h,
-              sys_days{2024y / October / 9} + 10h,
+              start_time + 10h,
+              start_time + 11h,
           },
           {
-              sys_days{2024y / October / 9} + 11h,
-              sys_days{2024y / October / 9} + 13h,
+              start_time + 13h,
+              start_time + 14h,
           },
           {
-              sys_days{2024y / October / 9} + 14h,
-              sys_days{2024y / October / 9} + 15h,
+              start_time + 15h,
+              start_time + 16h,
+          },
+      },
+      {
+          {
+              start_time + 9h,
+              start_time + 10h,
           },
           {
-              sys_days{2024y / October / 9} + 16h,
-              sys_days{2024y / October / 9} + 18h,
+              start_time + 11h,
+              start_time + 13h,
           },
           {
-              sys_days{2024y / October / 9} + 20h,
-              sys_days{2024y / October / 9} + 21h,
+              start_time + 14h,
+              start_time + 15h,
+          },
+          {
+              start_time + 16h,
+              start_time + 18h,
+          },
+          {
+              start_time + 20h,
+              start_time + 21h,
           },
       });
 }

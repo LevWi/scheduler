@@ -130,7 +130,7 @@ func (intervals *Intervals) Unite() {
 	*intervals = unions(*intervals)
 }
 
-func unions(intervals Intervals) Intervals {
+func unions(intervals Intervals) Intervals { //TODO it is broken
 	i, j := 0, 1
 	for ; j < len(intervals); j++ {
 		if intervals[i].IsOverlap(intervals[j]) {
