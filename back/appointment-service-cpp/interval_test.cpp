@@ -2,12 +2,13 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <vector>
 import IntervalModule;
 
 using Clock = std::chrono::system_clock;
 using TimePoint = Clock::time_point;
-using Interval = shed::Interval<TimePoint>;
-using Intervals = shed::Intervals<TimePoint>;
+using Interval = ::lf::Interval<TimePoint>;
+using Intervals = ::lf::Intervals<TimePoint>;
 
 using namespace std::chrono;
 

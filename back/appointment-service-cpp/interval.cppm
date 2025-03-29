@@ -3,11 +3,12 @@ module;
 #include <algorithm>
 #include <chrono>
 #include <vector>
+#include <ranges>
 
 export module IntervalModule;
 // import std;
 
-export namespace shed {
+export namespace lf {
 
 template <typename T>
 concept isTimePoint =
@@ -15,7 +16,7 @@ concept isTimePoint =
 
 template <isTimePoint Tp>
 struct Interval {
-  using Timepoint = Tp;
+  using TimePoint = Tp;
   Tp start{};
   Tp end{};
 
@@ -111,13 +112,12 @@ void prepare_united(Intervals<Tp> &intervals) {
   intervals.erase(i + 1, intervals.end());
 }
 
-template <typename Tp>
-Intervals<Tp> passed_intervals(const Intervals<Tp> &intervals,
-                               const Intervals<Tp> &exclusions) {
+template<isTimePoint Tp, typename Out = Intervals<Tp>>
+Out passed_intervals(std::span<const Interval<Tp>> intervals,
+                              std::span<const Interval<Tp>> exclusions) {
   if (intervals.empty()) return {};
-  if (exclusions.empty()) return intervals;
-
-  Intervals<Tp> out;
+  if (exclusions.empty()) return std::ranges::to<Out>(intervals);
+  Out out;
   out.reserve(intervals.size());
   std::size_t exclusionIndex = 0;
   Interval<Tp> tmp{};
@@ -158,4 +158,13 @@ Intervals<Tp> passed_intervals(const Intervals<Tp> &intervals,
 
   return out;
 }
+
+template<std::ranges::random_access_range R>
+auto passed_intervals(R&& intervals,
+                      R&& exclusions)
+{
+  using Tp = std::ranges::range_value_t<R>::TimePoint;
+  return passed_intervals<Tp>(intervals, exclusions);
+}
+
 }  // namespace shed
