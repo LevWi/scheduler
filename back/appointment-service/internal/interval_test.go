@@ -1,6 +1,7 @@
 package common
 
 import (
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -143,6 +144,63 @@ func TestIntervalSlices(t *testing.T) {
 	if !intervals.HasOverlaps() {
 		t.Fatalf("intervals should has overlap %v", intervals)
 	}
+}
+
+func TestIntervalsUnite(t *testing.T) {
+	type Expected = Intervals
+	checkCase := func(intervals Intervals, expected Expected) {
+		_, filename, line, _ := runtime.Caller(1)
+		intervals.Unite()
+		if !slices.Equal(intervals, expected) {
+			t.Fatalf("%s:%d: expected %v, got %v", filename, line, expected, intervals)
+		}
+	}
+
+	// Test empty intervals
+	checkCase(Intervals{}, Expected{})
+
+	// Test single interval
+	singleInterval := Intervals{
+		{Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 10, 0, 0, 0, time.UTC)},
+	}
+	checkCase(singleInterval, singleInterval.Copy())
+
+	// Test non-overlapping intervals
+	nonOverlapping := Intervals{
+		{Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 10, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 11, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 14, 0, 0, 0, time.UTC)},
+	}
+	checkCase(nonOverlapping, nonOverlapping.Copy())
+
+	// Test overlapping intervals
+	overlapping := Intervals{
+		{Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 11, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 10, 30, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 12, 1, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC)},
+	}
+	expectedOverlapping := Intervals{
+		{Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC)},
+	}
+	checkCase(overlapping, expectedOverlapping)
+
+	// Test multiple overlapping intervals
+	multipleOverlapping := Intervals{
+		{Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 11, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 10, 30, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 14, 1, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 14, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 14, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 16, 0, 0, 0, time.UTC)},
+	}
+	expectedMultipleOverlapping := Intervals{
+		{Start: time.Date(2024, 10, 9, 9, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 12, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 13, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC)},
+		{Start: time.Date(2024, 10, 9, 15, 0, 0, 0, time.UTC), End: time.Date(2024, 10, 9, 16, 0, 0, 0, time.UTC)},
+	}
+	checkCase(multipleOverlapping, expectedMultipleOverlapping)
 }
 
 func TestSetPassedIntervals(t *testing.T) {

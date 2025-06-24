@@ -84,7 +84,7 @@ func (i Intervals) IsSorted() bool {
 // Note: Expected sorted slice
 // TODO check it in debug mode?
 func (intervals Intervals) HasOverlaps() bool {
-	for i := 0; i < len(intervals)-1; i++ {
+	for i := range len(intervals) - 1 {
 		if intervals[i].IsOverlap(intervals[i+1]) {
 			return true
 		}
@@ -130,18 +130,27 @@ func (intervals *Intervals) Unite() {
 	*intervals = unions(*intervals)
 }
 
-func unions(intervals Intervals) Intervals { //TODO it is broken
-	i, j := 0, 1
-	for ; j < len(intervals); j++ {
+func unions(intervals Intervals) Intervals {
+	if len(intervals) == 0 {
+		return intervals
+	}
+
+	i := 0
+	for ; i < len(intervals)-1 && !intervals[i].IsOverlap(intervals[i+1]); i++ {
+
+	}
+
+	for j := i + 1; j < len(intervals); j++ {
 		if intervals[i].IsOverlap(intervals[j]) {
 			if intervals[i].End.Compare(intervals[j].End) < 0 {
 				intervals[i].End = intervals[j].End
 			}
 		} else {
 			i++
+			intervals[i] = intervals[j]
 		}
 	}
-	return intervals[: len(intervals)-i : cap(intervals)]
+	return intervals[: i+1 : cap(intervals)]
 }
 
 func PrepareUnited(intervals Intervals) Intervals {
