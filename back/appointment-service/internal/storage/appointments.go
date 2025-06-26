@@ -36,6 +36,7 @@ type DbBusinessRule struct {
 	Rule DBRule
 }
 
+// TODO IF NOT EXISTS
 const queryCreateAppointmentsTable = `CREATE TABLE "appointments" (
 	"date_start"	  INTEGER NOT NULL,
 	"date_end"	  INTEGER NOT NULL,
