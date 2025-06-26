@@ -9,7 +9,7 @@ import (
 
 var ErrWrongPassword = bcrypt.ErrMismatchedHashAndPassword
 
-const createUsersTable = `CREATE TABLE IF NOT EXISTS users (
+const createUsersTable = `CREATE TABLE IF NOT EXISTS users_pwd (
 	id INTEGER PRIMARY KEY,
 	username TEXT NOT NULL UNIQUE,
 	password TEXT NOT NULL
@@ -24,13 +24,13 @@ func CreateUsersTable(db *Storage) error {
 }
 
 // TODO add checking requirements for password symbols somewhere
-func (db *Storage) CreateUser(user string, password string) error {
+func (db *Storage) CreateUserPassword(user string, password string) error {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("[CreateUser] bcrypt error: %w", err)
 	}
 
-	_, err = db.Exec("INSERT INTO users (username, password) VALUES ($1, $2)", user, hashed)
+	_, err = db.Exec("INSERT INTO users_pwd (username, password) VALUES ($1, $2)", user, hashed)
 	if err != nil {
 		return fmt.Errorf("[CreateUser] db error: %w", err)
 	}
@@ -38,9 +38,42 @@ func (db *Storage) CreateUser(user string, password string) error {
 	return nil
 }
 
-func (db *Storage) CheckUser(user string, password string) error {
+func (db *Storage) UpdateUserPassword(user string, oldPword string, newPword string) error {
+	err := db.CheckUserPassword(user, oldPword)
+	if err != nil {
+		return err
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("[UpdateUserPassword] bcrypt error: %w", err)
+	}
+
+	_, err = db.Exec("UPDATE users_pwd SET password = $1 WHERE username = $2", newHash, user)
+	if err != nil {
+		return fmt.Errorf("[UpdateUserPassword] db error: %w", err)
+	}
+
+	return nil
+}
+
+func (db *Storage) DeleteUser(user string, password string) error {
+	err := db.CheckUserPassword(user, password)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM users_pwd WHERE username = $1", user)
+	if err != nil {
+		return fmt.Errorf("[DeleteUser] db error: %w", err)
+	}
+	return nil
+
+}
+
+func (db *Storage) CheckUserPassword(user string, password string) error {
 	var storedHash string
-	err := db.Get(&storedHash, "SELECT password FROM users WHERE username = $1", user)
+	err := db.Get(&storedHash, "SELECT password FROM users_pwd WHERE username = $1", user)
 	if err != nil {
 		return fmt.Errorf("[CheckUser] db error: %w", err)
 	}
