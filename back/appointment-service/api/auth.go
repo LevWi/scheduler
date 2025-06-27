@@ -15,51 +15,95 @@ var ErrUnauthorized = errors.New("unauthorized")
 type UserID = common.ID
 
 type UserChecker interface {
+	IsExist(uid UserID) (bool, error)
 	Check(username string, password string) (UserID, error)
 }
 
-func LoginHandler(store sessions.Store, uc UserChecker, h HttpIO) {
-	if h.Req.Method != "POST" {
-		slog.WarnContext(h.Req.Context(), "wrong method")
-		h.Wrt.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	err := h.Req.ParseForm()
-	if err != nil {
-		slog.DebugContext(h.Req.Context(), "parse request err")
-		h.Wrt.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	username := h.Req.PostForm.Get("username")
-	password := h.Req.PostForm.Get("password")
-
-	uid, err := uc.Check(username, password)
-	if err != nil {
-		slog.WarnContext(h.Req.Context(), "try login", username, err.Error())
-		if errors.Is(err, ErrNotFound) || errors.Is(err, ErrUnauthorized) {
-			http.Error(h.Wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			slog.WarnContext(r.Context(), "wrong method")
+			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		h.Wrt.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+		err := r.ParseForm()
+		if err != nil {
+			slog.DebugContext(r.Context(), "parse request err")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
-	session, err := store.Get(h.Req, "sid")
-	if err != nil {
-		slog.WarnContext(h.Req.Context(), "sessions", "err", err.Error())
-		// TODO where error handling?
-	}
+		username := r.PostForm.Get("username")
+		password := r.PostForm.Get("password")
 
-	session.Values["uid"] = uid
-	session.Save(h.Req, h.Wrt)
+		uid, err := uc.Check(username, password)
+		if err != nil {
+			slog.WarnContext(r.Context(), "try login", username, err.Error())
+			if errors.Is(err, ErrNotFound) || errors.Is(err, ErrUnauthorized) {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-	h.Wrt.WriteHeader(http.StatusOK)
+		session, err := store.Get(r, "sid")
+		if err != nil {
+			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
+			// TODO where error handling?
+		}
+
+		session.Values["uid"] = uid
+		session.Save(r, w)
+
+		w.WriteHeader(http.StatusOK)
+	})
 }
 
-func LogoutHandler(store sessions.Store, h HttpIO) {
-	session, _ := store.Get(h.Req, "sid")
-	delete(session.Values, "uid")
-	session.Save(h.Req, h.Wrt)
-	h.Wrt.WriteHeader(http.StatusOK)
+func LogoutHandler(store sessions.Store) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, _ := store.Get(r, "sid")
+		delete(session.Values, "uid")
+		session.Save(r, w)
+		w.WriteHeader(http.StatusOK)
+	})
+}
+
+func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, "sid")
+		if err != nil {
+			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
+			http.Error(w, "sid internal error", http.StatusInternalServerError)
+			return
+		}
+
+		uidi, ok := session.Values["uid"]
+		if !ok {
+			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
+			return
+		}
+
+		uid, ok := uidi.(string)
+		if !ok {
+			slog.WarnContext(r.Context(), "sessions", "err", "uid cast error")
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		//TODO can we avoid it in the next steps by erasing uid field?
+		exist, err := uc.IsExist(uid)
+		if err != nil {
+			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		if !exist {
+			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
