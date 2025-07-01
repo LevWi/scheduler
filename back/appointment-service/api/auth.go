@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -13,10 +14,16 @@ var ErrNotFound = errors.New("not found")
 var ErrUnauthorized = errors.New("unauthorized")
 
 type UserID = common.ID
+type UserIdKey struct{}
 
 type UserChecker interface {
 	IsExist(uid UserID) (bool, error)
 	Check(username string, password string) (UserID, error)
+}
+
+func GetUserID(c context.Context) UserID {
+	uid, _ := c.Value(UserIdKey{}).(string)
+	return uid
 }
 
 func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
@@ -86,6 +93,7 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 
 		uid, ok := uidi.(string)
 		if !ok {
+			//TODO print request_id ?
 			slog.WarnContext(r.Context(), "sessions", "err", "uid cast error")
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -104,6 +112,7 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), UserIdKey{}, uid)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

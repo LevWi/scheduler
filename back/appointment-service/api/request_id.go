@@ -20,3 +20,8 @@ func PassRequestIdToCtx(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+func GetRequestID(c context.Context) string {
+	id, _ := c.Value(RequestIdKey{}).(string)
+	return id
+}
