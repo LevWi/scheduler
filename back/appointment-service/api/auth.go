@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-var ErrNotFound = errors.New("not found")
 var ErrUnauthorized = errors.New("unauthorized")
 
 type UserID = common.ID
@@ -39,14 +38,16 @@ func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		http.PostForm()
 
+		//TODO use mux.Vars()
 		username := r.PostForm.Get("username")
 		password := r.PostForm.Get("password")
 
 		uid, err := uc.Check(username, password)
 		if err != nil {
 			slog.WarnContext(r.Context(), "try login", username, err.Error())
-			if errors.Is(err, ErrNotFound) || errors.Is(err, ErrUnauthorized) {
+			if errors.Is(err, common.ErrNotFound) || errors.Is(err, ErrUnauthorized) {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
@@ -114,5 +115,39 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 
 		ctx := context.WithValue(r.Context(), UserIdKey{}, uid)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func DeleteUserHandler(store sessions.Store) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, "sid")
+		if err != nil {
+			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
+			http.Error(w, "sid internal error", http.StatusInternalServerError)
+			return
+		}
+		//TODO where to get username?
+		uidi, ok := session.Values["uid"]
+		if !ok {
+			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
+			return
+		}
+
+		err = r.ParseForm()
+		if err != nil {
+			slog.DebugContext(r.Context(), "parse request err")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		password := r.Form.Get("password")
+
+		uid, ok := uidi.(string)
+		if !ok {
+			//TODO print request_id ?
+			slog.WarnContext(r.Context(), "sessions", "err", "uid cast error")
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
 	})
 }

@@ -3,7 +3,9 @@ package storage
 import (
 	"errors"
 	"fmt"
+	common "scheduler/appointment-service/internal"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -30,7 +32,10 @@ func (db *Storage) CreateUserPassword(user string, password string) error {
 		return fmt.Errorf("[CreateUser] bcrypt error: %w", err)
 	}
 
-	_, err = db.Exec("INSERT INTO users_pwd (username, password) VALUES ($1, $2)", user, hashed)
+	//TODO Handle error instead panic ?
+	id := uuid.NewString()
+
+	_, err = db.Exec("INSERT INTO users_pwd (id, username, password) VALUES ($1, $2, $3)", id, user, hashed)
 	if err != nil {
 		return fmt.Errorf("[CreateUser] db error: %w", err)
 	}
@@ -69,6 +74,18 @@ func (db *Storage) DeleteUser(user string, password string) error {
 	}
 	return nil
 
+}
+
+func (db *Storage) IsExist(uuid common.ID) error {
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM users_pwd WHERE id = $1", uuid)
+	if err != nil {
+		return fmt.Errorf("[IsExist] db error: %w", err)
+	}
+	if count == 0 {
+		return common.ErrNotFound
+	}
+	return nil
 }
 
 func (db *Storage) CheckUserPassword(user string, password string) error {
