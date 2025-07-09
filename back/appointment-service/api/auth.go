@@ -20,11 +20,16 @@ type UserChecker interface {
 	Check(username string, password string) (UserID, error)
 }
 
+type DeleteUser interface {
+	Delete(uuid UserID, password string) error
+}
+
 func GetUserID(c context.Context) UserID {
 	uid, _ := c.Value(UserIdKey{}).(string)
 	return uid
 }
 
+// Required application/x-www-form-urlencoded format
 func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -38,9 +43,7 @@ func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		http.PostForm()
 
-		//TODO use mux.Vars()
 		username := r.PostForm.Get("username")
 		password := r.PostForm.Get("password")
 
@@ -118,7 +121,7 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 	})
 }
 
-func DeleteUserHandler(store sessions.Store) http.Handler {
+func DeleteUserHandler(store sessions.Store, du DeleteUser) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "sid")
 		if err != nil {
@@ -149,5 +152,11 @@ func DeleteUserHandler(store sessions.Store) http.Handler {
 			return
 		}
 
+		err = du.Delete(uid, password)
+		if err != nil {
+			slog.DebugContext(r.Context(), "delete user error", "err", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	})
 }

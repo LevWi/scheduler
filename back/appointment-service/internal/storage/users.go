@@ -62,18 +62,17 @@ func (db *Storage) UpdateUserPassword(user string, oldPword string, newPword str
 	return nil
 }
 
-func (db *Storage) DeleteUser(user string, password string) error {
-	err := db.CheckUserPassword(user, password)
+func (db *Storage) DeleteUser(uuid common.ID, password string) error {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return fmt.Errorf("[CreateUser] bcrypt error: %w", err)
 	}
 
-	_, err = db.Exec("DELETE FROM users_pwd WHERE username = $1", user)
+	_, err = db.Exec("DELETE FROM users_pwd WHERE id = $1 AND password = $2", uuid, hashed)
 	if err != nil {
 		return fmt.Errorf("[DeleteUser] db error: %w", err)
 	}
 	return nil
-
 }
 
 func (db *Storage) IsExist(uuid common.ID) error {

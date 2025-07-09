@@ -11,6 +11,7 @@ import (
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/storage"
 
+	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -28,6 +29,10 @@ func main() {
 		slog.Error(err.Error())
 	}
 	defer db.Close()
+
+	const UserCookieAge = 85400 * 5 // 5 days
+	s := sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
+	s.MaxAge(UserCookieAge)
 
 	storage := storage.Storage{DB: db}
 	router := server.NewRouter(&storage)
