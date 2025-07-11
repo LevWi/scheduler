@@ -16,12 +16,8 @@ type UserID = common.ID
 type UserIdKey struct{}
 
 type UserChecker interface {
-	IsExist(uid UserID) (bool, error)
+	IsExist(uid UserID) error
 	Check(username string, password string) (UserID, error)
-}
-
-type DeleteUser interface {
-	Delete(uuid UserID, password string) error
 }
 
 func GetUserID(c context.Context) UserID {
@@ -30,8 +26,8 @@ func GetUserID(c context.Context) UserID {
 }
 
 // Required application/x-www-form-urlencoded format
-func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func LoginHandler(store sessions.Store, uc UserChecker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			slog.WarnContext(r.Context(), "wrong method")
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -68,20 +64,20 @@ func LoginHandler(store sessions.Store, uc UserChecker) http.Handler {
 		session.Save(r, w)
 
 		w.WriteHeader(http.StatusOK)
-	})
+	}
 }
 
-func LogoutHandler(store sessions.Store) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func LogoutHandler(store sessions.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, "sid")
 		delete(session.Values, "uid")
 		session.Save(r, w)
 		w.WriteHeader(http.StatusOK)
-	})
+	}
 }
 
-func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "sid")
 		if err != nil {
 			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
@@ -104,25 +100,27 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 		}
 
 		//TODO can we avoid it in the next steps by erasing uid field?
-		exist, err := uc.IsExist(uid)
+		err = uc.IsExist(uid)
+
+		if err == common.ErrNotFound {
+			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
+			return
+		}
+
 		if err != nil {
 			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
-		if !exist {
-			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
-			return
-		}
-
 		ctx := context.WithValue(r.Context(), UserIdKey{}, uid)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}
 }
 
-func DeleteUserHandler(store sessions.Store, du DeleteUser) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// TODO if cache will be used make sure that user was cleared from there
+func DeleteUserHandler(store sessions.Store, deleteUser func(common.ID, string) error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "sid")
 		if err != nil {
 			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
@@ -152,11 +150,15 @@ func DeleteUserHandler(store sessions.Store, du DeleteUser) http.Handler {
 			return
 		}
 
-		err = du.Delete(uid, password)
+		err = deleteUser(uid, password)
 		if err != nil {
-			slog.DebugContext(r.Context(), "delete user error", "err", err.Error())
+			slog.WarnContext(r.Context(), "delete user error", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-	})
+
+		delete(session.Values, "uid")
+		session.Save(r, w)
+		w.WriteHeader(http.StatusOK)
+	}
 }

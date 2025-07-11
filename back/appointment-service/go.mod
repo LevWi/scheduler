@@ -9,6 +9,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.23
 	github.com/teambition/rrule-go v1.8.2
+	golang.org/x/crypto v0.39.0
 )
 
 require github.com/gorilla/securecookie v1.1.2 // indirect

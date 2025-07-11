@@ -1,6 +1,7 @@
 package server
 
 import (
+	common "scheduler/appointment-service/internal"
 	"testing"
 	"time"
 )
@@ -24,14 +25,14 @@ func (uc MockUserChecker) IsExist(uid UserID) (bool, error) {
 func (uc MockUserChecker) Check(username string, password string) (UserID, error) {
 	v, ok := uc.m[username]
 	if !ok {
-		return "", ErrNotFound
+		return "", common.ErrNotFound
 	}
 
 	if v.pass == password {
 		return v.uid, nil
 	}
 
-	return "", ErrNotFound
+	return "", common.ErrNotFound
 }
 
 func TestCheckTimeParse(t *testing.T) {

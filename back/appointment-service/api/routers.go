@@ -7,6 +7,7 @@ import (
 	"scheduler/appointment-service/internal/storage"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 )
 
 type Route struct {
@@ -18,7 +19,15 @@ type Route struct {
 
 type Routes []Route
 
-func NewRouter(s *storage.Storage) *mux.Router {
+type UserCheckWrap struct {
+	*storage.Storage
+}
+
+func (uc UserCheckWrap) Check(username string, password string) (UserID, error) {
+	return uc.CheckUserPassword(username, password)
+}
+
+func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
 	var routes = Routes{
@@ -32,13 +41,31 @@ func NewRouter(s *storage.Storage) *mux.Router {
 			"SlotsBusinessIdGet",
 			"GET",
 			"/slots/{business_id}",
-			SlotsBusinessIdGetFunc(s),
+			SlotsBusinessIdGetFunc(sto),
 		},
 		Route{
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots/{business_id}",
-			SlotsBusinessIdPostFunc(s),
+			SlotsBusinessIdPostFunc(sto),
+		},
+		Route{
+			"Login",
+			"POST",
+			"/login",
+			LoginHandler(ses, UserCheckWrap{sto}),
+		},
+		Route{
+			"Logout",
+			"POST",
+			"/logout",
+			LogoutHandler(ses),
+		},
+		Route{
+			"DeleteUser",
+			"DELETE",
+			"/user",
+			CheckAuthHandler(ses, UserCheckWrap{sto}, DeleteUserHandler(ses, sto.DeleteUser)),
 		},
 	}
 
