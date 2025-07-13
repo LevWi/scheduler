@@ -69,6 +69,7 @@ func (db *Storage) DeleteUser(id common.ID, password string) error {
 		return fmt.Errorf("[CreateUser] bcrypt error: %w", err)
 	}
 
+	//TODO don't delete user. Update a status cell value
 	_, err = db.Exec("DELETE FROM users_pwd WHERE id = $1 AND pass_hash = $2", id, hashed)
 	if err != nil {
 		return fmt.Errorf("[DeleteUser] db error: %w", err)
@@ -106,7 +107,7 @@ func (db *Storage) CheckUserPassword(user string, password string) (common.ID, e
 	err = bcrypt.CompareHashAndPassword([]byte(dbUser.pass_hash), []byte(password))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return "", ErrWrongPassword
+			return "", common.ErrUnauthorized
 		}
 		return "", fmt.Errorf("[CheckUserPassword] unexpected error: %w", err)
 	}

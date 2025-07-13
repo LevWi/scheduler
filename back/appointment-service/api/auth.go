@@ -10,8 +10,6 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-var ErrUnauthorized = errors.New("unauthorized")
-
 type UserID = common.ID
 type UserIdKey struct{}
 
@@ -26,6 +24,7 @@ func GetUserID(c context.Context) UserID {
 }
 
 // Required application/x-www-form-urlencoded format
+// TODO add protection against brute force
 func LoginHandler(store sessions.Store, uc UserChecker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -46,7 +45,7 @@ func LoginHandler(store sessions.Store, uc UserChecker) http.HandlerFunc {
 		uid, err := uc.Check(username, password)
 		if err != nil {
 			slog.WarnContext(r.Context(), "try login", username, err.Error())
-			if errors.Is(err, common.ErrNotFound) || errors.Is(err, ErrUnauthorized) {
+			if errors.Is(err, common.ErrNotFound) || errors.Is(err, common.ErrUnauthorized) {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
@@ -69,7 +68,11 @@ func LoginHandler(store sessions.Store, uc UserChecker) http.HandlerFunc {
 
 func LogoutHandler(store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if len(GetUserID(r.Context())) == 0 {
+			panic("uid not found")
+		}
 		session, _ := store.Get(r, "sid")
+
 		delete(session.Values, "uid")
 		session.Save(r, w)
 		w.WriteHeader(http.StatusOK)
@@ -80,7 +83,7 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "sid")
 		if err != nil {
-			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
+			slog.WarnContext(r.Context(), "[CheckAuthHandler] sessions", "err", err.Error())
 			http.Error(w, "sid internal error", http.StatusInternalServerError)
 			return
 		}
@@ -93,6 +96,9 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 
 		uid, ok := uidi.(string)
 		if !ok {
+			delete(session.Values, "uid")
+			session.Save(r, w)
+
 			//TODO print request_id ?
 			slog.WarnContext(r.Context(), "sessions", "err", "uid cast error")
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -121,32 +127,22 @@ func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) h
 // TODO if cache will be used make sure that user was cleared from there
 func DeleteUserHandler(store sessions.Store, deleteUser func(common.ID, string) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "sid")
-		if err != nil {
-			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
-			http.Error(w, "sid internal error", http.StatusInternalServerError)
-			return
-		}
-		//TODO where to get username?
-		uidi, ok := session.Values["uid"]
-		if !ok {
-			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
-			return
+		uid := GetUserID(r.Context())
+		if len(uid) == 0 {
+			panic("uid not found")
 		}
 
-		err = r.ParseForm()
+		err := r.ParseForm()
 		if err != nil {
 			slog.DebugContext(r.Context(), "parse request err")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		password := r.Form.Get("password")
 
-		uid, ok := uidi.(string)
-		if !ok {
-			//TODO print request_id ?
-			slog.WarnContext(r.Context(), "sessions", "err", "uid cast error")
-			http.Error(w, "internal error", http.StatusInternalServerError)
+		password := r.Form.Get("password")
+		if len(password) == 0 {
+			slog.DebugContext(r.Context(), "password expected")
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
@@ -154,6 +150,13 @@ func DeleteUserHandler(store sessions.Store, deleteUser func(common.ID, string) 
 		if err != nil {
 			slog.WarnContext(r.Context(), "delete user error", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		session, err := store.Get(r, "sid")
+		if err != nil {
+			slog.WarnContext(r.Context(), "[DeleteUserHandler] sessions", "err", err.Error())
+			http.Error(w, "sid internal error", http.StatusInternalServerError)
 			return
 		}
 

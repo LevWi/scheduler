@@ -30,6 +30,7 @@ func (uc UserCheckWrap) Check(username string, password string) (UserID, error) 
 func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
+	//TODO add/remove business rules
 	var routes = Routes{
 		Route{
 			"Index",
@@ -59,7 +60,7 @@ func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 			"Logout",
 			"POST",
 			"/logout",
-			LogoutHandler(ses),
+			CheckAuthHandler(ses, UserCheckWrap{sto}, LogoutHandler(ses)),
 		},
 		Route{
 			"DeleteUser",
