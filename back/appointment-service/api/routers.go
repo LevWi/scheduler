@@ -3,11 +3,14 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"time"
 
+	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/storage"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"golang.org/x/time/rate"
 )
 
 type Route struct {
@@ -19,16 +22,28 @@ type Route struct {
 
 type Routes []Route
 
-type UserCheckWrap struct {
+type userCheckWrap struct {
 	*storage.Storage
+	table *common.LimitsTable[string]
 }
 
-func (uc UserCheckWrap) Check(username string, password string) (UserID, error) {
+func (uc userCheckWrap) Check(username string, password string) (UserID, error) {
+	if !uc.table.Allow(username) {
+		return "", ErrSecurityRestriction
+	}
 	return uc.CheckUserPassword(username, password)
 }
 
 func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
+
+	restrictionTable := common.NewLimitsTable[string](
+		//TODO need more complex solution
+		common.RequestLimitUpdateFunc(func(in *rate.Limiter) *rate.Limiter {
+			return rate.NewLimiter(rate.Every(time.Second*15), 1)
+		}))
+
+	userCheck := userCheckWrap{sto, restrictionTable}
 
 	//TODO add/remove business rules
 	var routes = Routes{
@@ -54,19 +69,20 @@ func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 			"Login",
 			"POST",
 			"/login",
-			LoginHandler(ses, UserCheckWrap{sto}),
+			//TODO add IP address check
+			LoginHandler(ses, userCheck),
 		},
 		Route{
 			"Logout",
 			"POST",
 			"/logout",
-			CheckAuthHandler(ses, UserCheckWrap{sto}, LogoutHandler(ses)),
+			CheckAuthHandler(ses, userCheck, LogoutHandler(ses)),
 		},
 		Route{
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			CheckAuthHandler(ses, UserCheckWrap{sto}, DeleteUserHandler(ses, sto.DeleteUser)),
+			CheckAuthHandler(ses, userCheck, DeleteUserHandler(ses, sto.DeleteUser)),
 		},
 	}
 

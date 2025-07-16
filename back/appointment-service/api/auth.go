@@ -13,8 +13,13 @@ import (
 type UserID = common.ID
 type UserIdKey struct{}
 
-type UserChecker interface {
+var ErrSecurityRestriction = errors.New("security restriction")
+
+type ExistingUserCheck interface {
 	IsExist(uid UserID) error
+}
+
+type AuthUserCheck interface {
 	Check(username string, password string) (UserID, error)
 }
 
@@ -24,8 +29,8 @@ func GetUserID(c context.Context) UserID {
 }
 
 // Required application/x-www-form-urlencoded format
-// TODO add protection against brute force
-func LoginHandler(store sessions.Store, uc UserChecker) http.HandlerFunc {
+// TODO add Request Throttling , CSRF Protection
+func LoginHandler(store sessions.Store, ac AuthUserCheck) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			slog.WarnContext(r.Context(), "wrong method")
@@ -42,21 +47,31 @@ func LoginHandler(store sessions.Store, uc UserChecker) http.HandlerFunc {
 		username := r.PostForm.Get("username")
 		password := r.PostForm.Get("password")
 
-		uid, err := uc.Check(username, password)
+		uid, err := ac.Check(username, password)
 		if err != nil {
 			slog.WarnContext(r.Context(), "try login", username, err.Error())
 			if errors.Is(err, common.ErrNotFound) || errors.Is(err, common.ErrUnauthorized) {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
-			w.WriteHeader(http.StatusInternalServerError)
+			switch {
+			case errors.Is(err, common.ErrNotFound), errors.Is(err, common.ErrUnauthorized):
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			case errors.Is(err, ErrSecurityRestriction):
+				// TODO need notification about brute force attack
+				http.Error(w, "please try later", http.StatusTooManyRequests)
+			default:
+				w.WriteHeader(http.StatusInternalServerError)
+				slog.WarnContext(r.Context(), "[LoginHandler] user check", "err", err.Error())
+			}
 			return
 		}
 
 		session, err := store.Get(r, "sid")
 		if err != nil {
 			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
-			// TODO where error handling?
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 
 		session.Values["uid"] = uid
@@ -79,7 +94,7 @@ func LogoutHandler(store sessions.Store) http.HandlerFunc {
 	}
 }
 
-func CheckAuthHandler(store sessions.Store, uc UserChecker, next http.Handler) http.HandlerFunc {
+func CheckAuthHandler(store sessions.Store, uc ExistingUserCheck, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "sid")
 		if err != nil {

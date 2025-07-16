@@ -6,15 +6,21 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// TODO remove not needed keys function
 type LimitsTable[Key comparable] struct {
 	m        map[Key]*rate.Limiter
 	mu       sync.Mutex
-	settings RequestLimitSettings
+	producer RequestLimitUpdate
 }
 
-type RequestLimitSettings struct {
-	Limit rate.Limit
-	Burst int
+type RequestLimitUpdate interface {
+	Update(*rate.Limiter) *rate.Limiter
+}
+
+type RequestLimitUpdateFunc func(*rate.Limiter) *rate.Limiter
+
+func (fn RequestLimitUpdateFunc) Update(in *rate.Limiter) *rate.Limiter {
+	return fn(in)
 }
 
 func (l *LimitsTable[Key]) Allow(k Key) bool {
@@ -23,24 +29,23 @@ func (l *LimitsTable[Key]) Allow(k Key) bool {
 
 	limiter, exists := l.m[k]
 	if !exists {
-		limiter = rate.NewLimiter(l.settings.Limit, l.settings.Burst)
+		limiter = l.producer.Update(nil)
 		l.m[k] = limiter
 	}
 	//TODO add info about needed delay?
 	return limiter.Allow()
 }
 
-func (l *LimitsTable[Key]) SetNewSettings(s RequestLimitSettings) {
+func (l *LimitsTable[Key]) SetProducer(p RequestLimitUpdate) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	for _, limiter := range l.m {
-		limiter.SetLimit(s.Limit)
-		limiter.SetBurst(s.Burst)
+		l.producer.Update(limiter)
 	}
-	l.settings = s
+	l.producer = p
 }
 
-func NewRestrictionList[Key comparable](s RequestLimitSettings) *LimitsTable[Key] {
-	return &LimitsTable[Key]{settings: s}
+func NewLimitsTable[Key comparable](p RequestLimitUpdate) *LimitsTable[Key] {
+	return &LimitsTable[Key]{producer: p}
 }
