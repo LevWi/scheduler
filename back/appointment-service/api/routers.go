@@ -34,7 +34,7 @@ func (uc userCheckWrap) Check(username string, password string) (UserID, error) 
 	return uc.CheckUserPassword(username, password)
 }
 
-func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
+func NewRouter(storage storage.Storage, sesStore sessions.Store) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
 	restrictionTable := common.NewLimitsTable[string](
@@ -43,7 +43,7 @@ func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 			return rate.NewLimiter(rate.Every(time.Second*15), 1)
 		}))
 
-	userCheck := userCheckWrap{sto, restrictionTable}
+	userCheck := userCheckWrap{&storage, restrictionTable}
 
 	//TODO add/remove business rules
 	var routes = Routes{
@@ -57,32 +57,32 @@ func NewRouter(sto *storage.Storage, ses sessions.Store) *mux.Router {
 			"SlotsBusinessIdGet",
 			"GET",
 			"/slots/{business_id}",
-			SlotsBusinessIdGetFunc(sto),
+			SlotsBusinessIdGetFunc(&storage),
 		},
 		Route{
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots/{business_id}",
-			SlotsBusinessIdPostFunc(sto),
+			SlotsBusinessIdPostFunc(&storage),
 		},
 		Route{
 			"Login",
 			"POST",
 			"/login",
 			//TODO add IP address check
-			LoginHandler(ses, userCheck),
+			LoginHandler(sesStore, userCheck),
 		},
 		Route{
 			"Logout",
 			"POST",
 			"/logout",
-			CheckAuthHandler(ses, userCheck, LogoutHandler(ses)),
+			CheckAuthHandler(sesStore, userCheck, LogoutHandler(sesStore)),
 		},
 		Route{
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			CheckAuthHandler(ses, userCheck, DeleteUserHandler(ses, sto.DeleteUser)),
+			CheckAuthHandler(sesStore, userCheck, DeleteUserHandler(sesStore, storage.DeleteUser)),
 		},
 	}
 

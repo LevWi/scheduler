@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	common "scheduler/appointment-service/internal"
+	"time"
 
 	"github.com/gorilla/sessions"
 )
@@ -15,6 +16,18 @@ type UserIdKey struct{}
 
 var ErrSecurityRestriction = errors.New("security restriction")
 
+var (
+	StatusAuthorized   = "authorized"
+	StatusUnauthorized = "unauthorized"
+	Status2faRequired  = "2fa_required"
+
+	UserSessionName = "sid"
+
+	KeyUserID     = "uid"
+	KeyAuthStatus = "auth_stat"
+	KeyTimestamp  = "ts"
+)
+
 type ExistingUserCheck interface {
 	IsExist(uid UserID) error
 }
@@ -23,14 +36,14 @@ type AuthUserCheck interface {
 	Check(username string, password string) (UserID, error)
 }
 
-func GetUserID(c context.Context) UserID {
-	uid, _ := c.Value(UserIdKey{}).(string)
-	return uid
+func GetUserID(c context.Context) (UserID, bool) {
+	uid, ok := c.Value(UserIdKey{}).(string)
+	return uid, ok
 }
 
 // Required application/x-www-form-urlencoded format
 // TODO add Request Throttling , CSRF Protection
-func LoginHandler(store sessions.Store, ac AuthUserCheck) http.HandlerFunc {
+func LoginHandler(ses sessions.Store, ac AuthUserCheck) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			slog.WarnContext(r.Context(), "wrong method")
@@ -44,18 +57,23 @@ func LoginHandler(store sessions.Store, ac AuthUserCheck) http.HandlerFunc {
 			return
 		}
 
+		session, err := ses.Get(r, UserSessionName)
+		if err != nil {
+			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		username := r.PostForm.Get("username")
 		password := r.PostForm.Get("password")
 
 		uid, err := ac.Check(username, password)
 		if err != nil {
 			slog.WarnContext(r.Context(), "try login", username, err.Error())
-			if errors.Is(err, common.ErrNotFound) || errors.Is(err, common.ErrUnauthorized) {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-				return
-			}
 			switch {
 			case errors.Is(err, common.ErrNotFound), errors.Is(err, common.ErrUnauthorized):
+				session.Values[KeyAuthStatus] = StatusUnauthorized
+				session.Save(r, w)
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			case errors.Is(err, ErrSecurityRestriction):
 				// TODO need notification about brute force attack
@@ -67,28 +85,23 @@ func LoginHandler(store sessions.Store, ac AuthUserCheck) http.HandlerFunc {
 			return
 		}
 
-		session, err := store.Get(r, "sid")
-		if err != nil {
-			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		session.Values["uid"] = uid
+		session.Values[KeyUserID] = uid
+		session.Values[KeyAuthStatus] = Status2faRequired
+		session.Values[KeyTimestamp] = time.Now().UTC().Unix()
 		session.Save(r, w)
 
-		w.WriteHeader(http.StatusOK)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 	}
 }
 
 func LogoutHandler(store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if len(GetUserID(r.Context())) == 0 {
+		if _, ok := GetUserID(r.Context()); !ok {
 			panic("uid not found")
 		}
-		session, _ := store.Get(r, "sid")
+		session, _ := store.Get(r, UserSessionName)
 
-		delete(session.Values, "uid")
+		delete(session.Values, KeyUserID)
 		session.Save(r, w)
 		w.WriteHeader(http.StatusOK)
 	}
@@ -96,14 +109,14 @@ func LogoutHandler(store sessions.Store) http.HandlerFunc {
 
 func CheckAuthHandler(store sessions.Store, uc ExistingUserCheck, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "sid")
+		session, err := store.Get(r, UserSessionName)
 		if err != nil {
 			slog.WarnContext(r.Context(), "[CheckAuthHandler] sessions", "err", err.Error())
 			http.Error(w, "sid internal error", http.StatusInternalServerError)
 			return
 		}
 
-		uidi, ok := session.Values["uid"]
+		uidi, ok := session.Values[KeyUserID]
 		if !ok {
 			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
 			return
@@ -111,7 +124,7 @@ func CheckAuthHandler(store sessions.Store, uc ExistingUserCheck, next http.Hand
 
 		uid, ok := uidi.(string)
 		if !ok {
-			delete(session.Values, "uid")
+			delete(session.Values, KeyUserID)
 			session.Save(r, w)
 
 			//TODO print request_id ?
@@ -142,14 +155,14 @@ func CheckAuthHandler(store sessions.Store, uc ExistingUserCheck, next http.Hand
 // TODO if cache will be used make sure that user was cleared from there
 func DeleteUserHandler(store sessions.Store, deleteUser func(common.ID, string) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := GetUserID(r.Context())
-		if len(uid) == 0 {
+		uid, ok := GetUserID(r.Context())
+		if !ok {
 			panic("uid not found")
 		}
 
 		err := r.ParseForm()
 		if err != nil {
-			slog.DebugContext(r.Context(), "parse request err")
+			slog.DebugContext(r.Context(), "parse request", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -168,14 +181,14 @@ func DeleteUserHandler(store sessions.Store, deleteUser func(common.ID, string) 
 			return
 		}
 
-		session, err := store.Get(r, "sid")
+		session, err := store.Get(r, UserSessionName)
 		if err != nil {
 			slog.WarnContext(r.Context(), "[DeleteUserHandler] sessions", "err", err.Error())
 			http.Error(w, "sid internal error", http.StatusInternalServerError)
 			return
 		}
 
-		delete(session.Values, "uid")
+		delete(session.Values, KeyUserID)
 		session.Save(r, w)
 		w.WriteHeader(http.StatusOK)
 	}

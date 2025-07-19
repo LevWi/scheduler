@@ -7,7 +7,6 @@ import (
 	"os"
 
 	server "scheduler/appointment-service/api"
-
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/storage"
 
@@ -30,12 +29,12 @@ func main() {
 	}
 	defer db.Close()
 
-	const UserCookieAge = 85400 * 5 // 5 days
-	ses := sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
-	ses.MaxAge(UserCookieAge)
+	sessionStore := sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
+	sessionStore.MaxAge(85400 * 5) // 5 days
 
 	storage := storage.Storage{DB: db}
-	router := server.NewRouter(&storage, ses)
+
+	router := server.NewRouter(storage, sessionStore)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
