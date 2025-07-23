@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func Logger(inner http.Handler, name string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func Logger(inner http.Handler, name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
 		slog.InfoContext(r.Context(), "request",
@@ -17,5 +17,5 @@ func Logger(inner http.Handler, name string) http.Handler {
 			"start", time.Since(start))
 
 		inner.ServeHTTP(w, r)
-	})
+	}
 }

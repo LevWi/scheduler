@@ -76,11 +76,12 @@ func CalculateIntervals(in []IntervalRRuleWithType) Intervals {
 	var exclusion Intervals
 
 	for _, el := range in {
-		if el.Type == Exclusion {
+		switch el.Type {
+		case Exclusion:
 			exclusion = append(exclusion, el.Rule.GetIntervals()...)
-		} else if el.Type == Inclusion {
+		case Inclusion:
 			inclusion = append(inclusion, el.Rule.GetIntervals()...)
-		} else {
+		default:
 			panic("Unexpected value")
 		}
 	}
@@ -91,6 +92,7 @@ func CalculateIntervals(in []IntervalRRuleWithType) Intervals {
 	return inclusion.PassedIntervals(exclusion)
 }
 
+// TODO remove?
 func ConvertToIntervalRRuleWithType(jsonStrings []string) ([]IntervalRRuleWithType, error) {
 	var intervalsRRules []IntervalRRuleWithType
 	for _, el := range jsonStrings {

@@ -87,7 +87,7 @@ func LoginHandler(ses sessions.Store, ac AuthUserCheck) http.HandlerFunc {
 
 		session.Values[KeyUserID] = uid
 		session.Values[KeyAuthStatus] = Status2faRequired
-		session.Values[KeyTimestamp] = time.Now().UTC().Unix()
+		session.Values[KeyTimestamp] = common.TsSec(time.Now())
 		session.Save(r, w)
 
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)

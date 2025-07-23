@@ -1,12 +1,10 @@
 package storage
 
 import (
-	"errors"
-	"math/rand/v2"
 	common "scheduler/appointment-service/internal"
-	"slices"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -32,7 +30,7 @@ func (slot dbBusySlot) ToSlot() common.BusySlot {
 type DBRule = string
 
 type DbBusinessRule struct {
-	Id   int
+	Id   string
 	Rule DBRule
 }
 
@@ -47,7 +45,7 @@ const queryCreateAppointmentsTable = `CREATE TABLE "appointments" (
 
 // TODO add exclude type rule
 const createBusinessTable = `CREATE TABLE "business_work_rule" (
-	"id" INTEGER NOT NULL,
+	"id" TEXT NOT NULL,
 	"business_id" TEXT NOT NULL,
 	"rule"	  TEXT NOT NULL,
 	UNIQUE (id, business_id)
@@ -81,37 +79,20 @@ func (db *Storage) GetBusinessRules(business_id common.ID) ([]DbBusinessRule, er
 }
 
 // TODO check that rule valid ?
-func (db *Storage) AddBusinessRule(business_id common.ID, rule DBRule) error {
-	// Expected small count of rules for each business
-	var ids []int
-	err := db.Select(&ids, "SELECT id FROM business_work_rule WHERE business_id = $1",
-		string(business_id))
-	if err != nil {
-		return err
-	}
+// TODO return business rule id ?
+func (db *Storage) AddBusinessRule(businessID string, rule DBRule) error {
+	newID := uuid.New().String()
 
-	slices.Sort(ids)
-
-	idFound := false
-	newId := 0
-	for range 3 {
-		newId = rand.Int()
-		_, idFound = slices.BinarySearch(ids, newId)
-		if !idFound {
-			break
-		}
-	}
-
-	if idFound {
-		return errors.New("BusinessRule: Not found unique id. Try again")
-	}
-
-	_, err = db.Exec("INSERT INTO business_work_rule (id, business_id, rule) VALUES ($1, $2, $3)", newId, business_id, rule)
+	_, err := db.Exec(`
+		INSERT INTO business_work_rule (id, business_id, rule)
+		VALUES ($1, $2, $3)
+	`, newID, businessID, rule)
 	return err
 }
 
 // TODO is value deletion confirm needed?
-func (db *Storage) DeleteBusinessRule(business_id common.ID, id int) error {
+// TODO Do not delete permanently
+func (db *Storage) DeleteBusinessRule(business_id common.ID, id string) error {
 	_, err := db.Exec("DELETE FROM business_work_rule WHERE business_id = $1 AND id = $2",
 		business_id, id)
 	return err

@@ -3,6 +3,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	common "scheduler/appointment-service/internal"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -21,12 +22,15 @@ func GenerateOTPKeyBasic(login, company string) (*otp.Key, error) {
 
 type OTPSecret = string
 
-type OTPSecretStore interface {
+type OTPSecretGetter interface {
 	Get(UserID) (OTPSecret, error)
+}
+
+type OTPSecretSetter interface {
 	Set(UserID, OTPSecret) error
 }
 
-func GenerateOTPKey(secretStore OTPSecretStore) http.HandlerFunc {
+func GenerateOTPKey(secretStore OTPSecretGetter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// uid, ok := GetUserID(r.Context())
 		// if !ok {
@@ -38,7 +42,7 @@ func GenerateOTPKey(secretStore OTPSecretStore) http.HandlerFunc {
 
 // Required application/x-www-form-urlencoded format
 // Expected POST method
-func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretStore) http.HandlerFunc {
+func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretGetter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
@@ -78,7 +82,7 @@ func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretStore) htt
 			slog.ErrorContext(r.Context(), "[ValidateOTPassword] KeyTimestamp not found")
 			w.WriteHeader(http.StatusBadRequest)
 			return
-		} else if (time.Now().UTC().Unix() - ts) > kLoginTimeOut {
+		} else if (common.TsSec(time.Now()) - ts) > kLoginTimeOut {
 			slog.DebugContext(r.Context(), "[ValidateOTPassword] Timeout")
 
 			s.Options.MaxAge = -1
