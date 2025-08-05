@@ -13,10 +13,12 @@ import (
 var ErrWrongPassword = bcrypt.ErrMismatchedHashAndPassword
 
 const createUsersTable = `CREATE TABLE IF NOT EXISTS users_pwd (
-	id INTEGER PRIMARY KEY,
+	id TEXT PRIMARY KEY,
 	username TEXT NOT NULL UNIQUE,
-	pass_hash TEXT NOT NULL
+	hash TEXT NOT NULL
 );`
+
+type UserID common.ID
 
 func CreateUsersTable(db *Storage) error {
 	_, err := db.Exec(createUsersTable)
@@ -27,25 +29,25 @@ func CreateUsersTable(db *Storage) error {
 }
 
 // TODO add checking requirements for password symbols somewhere
-func (db *Storage) CreateUserPassword(user string, password string) error {
+func (db *Storage) CreateUserPassword(user string, password string) (UserID, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("[CreateUser] bcrypt error: %w", err)
+		return "", fmt.Errorf("[CreateUser] bcrypt error: %w", err)
 	}
 
 	//TODO Handle error instead panic ?
 	id := uuid.NewString()
 
-	_, err = db.Exec("INSERT INTO users_pwd (id, username, pass_hash) VALUES ($1, $2, $3)", id, user, hashed)
-	if err != nil {
-		return fmt.Errorf("[CreateUser] db error: %w", err)
-	}
-
-	return nil
+	_, err = db.Exec("INSERT INTO users_pwd (id, username, hash) VALUES ($1, $2, $3)", id, user, hashed)
+	return UserID(id), adjustDbError(err)
 }
 
-func (db *Storage) UpdateUserPassword(id common.ID, oldPword string, newPword string) error {
-	_, err := db.CheckUserPassword(id, oldPword)
+func (db *Storage) UpdateUserPassword(id UserID, oldPword string, newPword string) error {
+	u, err := db.readUserByID(id)
+	if err != nil {
+		return err
+	}
+	err = checkPassword(u.Hash, oldPword)
 	if err != nil {
 		return err
 	}
@@ -55,33 +57,41 @@ func (db *Storage) UpdateUserPassword(id common.ID, oldPword string, newPword st
 		return fmt.Errorf("[UpdateUserPassword] bcrypt error: %w", err)
 	}
 
-	_, err = db.Exec("UPDATE users_pwd SET pass_hash = $1 WHERE id = $2", newHash, id)
-	if err != nil {
-		return fmt.Errorf("[UpdateUserPassword] db error: %w", err)
-	}
-
-	return nil
+	_, err = db.Exec("UPDATE users_pwd SET hash = $1 WHERE id = $2", newHash, id)
+	return adjustDbError(err)
 }
 
-func (db *Storage) DeleteUser(id common.ID, password string) error {
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func (db *Storage) CheckUserPassword(user, password string) (UserID, error) {
+	u, err := db.readUser(user)
 	if err != nil {
-		return fmt.Errorf("[CreateUser] bcrypt error: %w", err)
+		return "", err
 	}
+	return UserID(u.Id), checkPassword(u.Hash, password)
+}
 
+func (db *Storage) DeleteUser(id UserID) error {
 	//TODO don't delete user. Update a status cell value
-	_, err = db.Exec("DELETE FROM users_pwd WHERE id = $1 AND pass_hash = $2", id, hashed)
-	if err != nil {
-		return fmt.Errorf("[DeleteUser] db error: %w", err)
-	}
-	return nil
+	_, err := db.Exec("DELETE FROM users_pwd WHERE id = $1", id)
+	return adjustDbError(err)
 }
 
-func (db *Storage) IsExist(id common.ID) error {
+func (db *Storage) DeleteUserWithCheck(user string, password string) error {
+	u, err := db.readUser(user)
+	if err != nil {
+		return err
+	}
+	err = checkPassword(u.Hash, password)
+	if err != nil {
+		return err
+	}
+	return db.DeleteUser(UserID(u.Id))
+}
+
+func (db *Storage) IsExist(id UserID) error {
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM users_pwd WHERE id = $1", id)
 	if err != nil {
-		return fmt.Errorf("[IsExist] db error: %w", err)
+		return adjustDbError(err)
 	}
 	if count == 0 {
 		return common.ErrNotFound
@@ -89,28 +99,53 @@ func (db *Storage) IsExist(id common.ID) error {
 	return nil
 }
 
-func (db *Storage) CheckUserPassword(user string, password string) (common.ID, error) {
-	type DBUser struct {
-		id        string
-		pass_hash string
-	}
+type dbUser struct {
+	Username string
+	Id       string
+	Hash     string
+}
 
-	var dbUser DBUser
-	err := db.Get(&dbUser, "SELECT id, pass_hash FROM users_pwd WHERE username = $1", user)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", common.ErrNotFound
-		}
-		return "", fmt.Errorf("[CheckUserPassword] db error: %w", err)
+func (u dbUser) User() User {
+	return User{
+		Username: u.Username,
+		Id:       UserID(u.Id),
+		Hash:     u.Hash,
 	}
+}
 
-	err = bcrypt.CompareHashAndPassword([]byte(dbUser.pass_hash), []byte(password))
-	if err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return "", common.ErrUnauthorized
-		}
-		return "", fmt.Errorf("[CheckUserPassword] unexpected error: %w", err)
+type User struct {
+	Username string
+	Id       UserID
+	Hash     string
+}
+
+// TODO add context?
+func adjustDbError(e error) error {
+	if e == nil {
+		return e
 	}
+	if errors.Is(e, sql.ErrNoRows) {
+		e = common.ErrNotFound
+	}
+	return fmt.Errorf("db error: %w", e)
+}
 
-	return dbUser.id, nil
+func (db *Storage) readUser(user string) (dbUser, error) {
+	var dbUser dbUser
+	err := db.Get(&dbUser, "SELECT * FROM users_pwd WHERE username = $1", user)
+	return dbUser, adjustDbError(err)
+}
+
+func (db *Storage) readUserByID(id UserID) (dbUser, error) {
+	var dbUser dbUser
+	err := db.Get(&dbUser, "SELECT * FROM users_pwd WHERE id = $1", id)
+	return dbUser, adjustDbError(err)
+}
+
+func checkPassword(hash, password string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		err = common.ErrUnauthorized
+	}
+	return err
 }

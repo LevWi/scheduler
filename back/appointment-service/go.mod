@@ -9,6 +9,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.23
 	github.com/pquerna/otp v1.5.0
+	github.com/stretchr/testify v1.3.0
 	github.com/teambition/rrule-go v1.8.2
 	golang.org/x/crypto v0.39.0
 	golang.org/x/time v0.12.0
@@ -16,5 +17,7 @@ require (
 
 require (
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+	github.com/davecgh/go-spew v1.1.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 )
