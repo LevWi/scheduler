@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"log"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	common "scheduler/appointment-service/internal"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -17,7 +19,46 @@ type OAuth2CfgProvider interface {
 	Get() (*oauth2.Config, error)
 }
 
-func OAuth2HTTPRedirectHandler(s sessions.Store, cfg OAuth2CfgProvider) http.HandlerFunc {
+type OAuth2SignIn interface {
+	Do(token *oauth2.Token) (common.ID, error)
+}
+
+type OAuth2ValidateState struct {
+	S sessions.Store
+}
+
+func (v *OAuth2ValidateState) PrepareState(w http.ResponseWriter, r *http.Request) (string, error) {
+	session, err := v.S.Get(r, "auth-session")
+	if err != nil {
+		return "", fmt.Errorf("session creation fail: %w", err)
+	}
+
+	state := generateState()
+	session.Values["oauth_state"] = state
+
+	err = session.Save(r, w)
+	if err != nil {
+		return "", fmt.Errorf("session saving fail: %w", err)
+	}
+	return state, nil
+}
+
+func (v *OAuth2ValidateState) Validate(w http.ResponseWriter, r *http.Request) error {
+	session, err := v.S.Get(r, "auth-session")
+	if err != nil {
+		return fmt.Errorf("%w: session creation fail: %w", common.ErrInternal, err)
+	}
+
+	//TODO delete oauth_state
+	expectedState, ok := session.Values["oauth_state"].(string)
+	queryState := r.URL.Query().Get("state")
+	if !ok || r.URL.Query().Get("state") != expectedState {
+		return fmt.Errorf("%w : state parameter expected %s, but got %s", common.ErrInvalidArgument, expectedState, queryState)
+	}
+	return nil
+}
+
+func OAuth2HTTPRedirectHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		oauthConfig, err := cfg.Get()
 		if err != nil {
@@ -26,45 +67,26 @@ func OAuth2HTTPRedirectHandler(s sessions.Store, cfg OAuth2CfgProvider) http.Han
 			return
 		}
 
-		session, err := s.Get(r, "auth-session")
+		state, err := v.PrepareState(w, r)
 		if err != nil {
-			slog.ErrorContext(r.Context(), "OAuth2HTTPRedirect session", "err", err.Error())
+			slog.ErrorContext(r.Context(), "OAuth2HTTPRedirect", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		state := generateState()
-		session.Values["oauth_state"] = state
-
-		err = session.Save(r, w)
-		if err != nil {
-			slog.ErrorContext(r.Context(), "OAuth2HTTPRedirect session save", "err", err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		url := oauthConfig.AuthCodeURL(state)
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, oauthConfig.AuthCodeURL(state), http.StatusTemporaryRedirect)
 	}
 }
 
-func OAuth2UserBackHandler(s sessions.Store, cfg OAuth2CfgProvider) http.HandlerFunc {
+func OAuth2HTTPUserBackHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider, singIn OAuth2SignIn) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := s.Get(r, "auth-session")
+		err := v.Validate(w, r)
 		if err != nil {
-			slog.ErrorContext(r.Context(), "OAuth2UserBack session", "err", err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		{
-			//TODO delete oauth_state
-			expectedState, ok := session.Values["oauth_state"].(string)
-			queryState := r.URL.Query().Get("state")
-			if !ok || r.URL.Query().Get("state") != expectedState {
-				slog.ErrorContext(r.Context(), "Invalid state parameter", "expected", expectedState, "actual", queryState)
-				http.Error(w, "Invalid state parameter", http.StatusBadRequest)
-				return
+			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
+			if errors.Is(err, common.ErrInvalidArgument) {
+				w.WriteHeader(http.StatusBadRequest)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
 			}
 		}
 
@@ -81,35 +103,25 @@ func OAuth2UserBackHandler(s sessions.Store, cfg OAuth2CfgProvider) http.Handler
 		token, err := oauthConfig.Exchange(ctx, code)
 		if err != nil {
 			slog.WarnContext(r.Context(), "OAuth2UserBack get config", "err", err.Error())
-			http.Error(w, "Failed to exchange token:", http.StatusInternalServerError)
+			http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
 			return
 		}
 
-		//TODO
-		// rawIDToken, ok := token.Extra("id_token").(string)
-		// if !ok {
-		// 	http.Error(w, "No id_token field in oauth2 token", http.StatusInternalServerError)
-		// 	return
-		// }
+		uid, err := singIn.Do(token)
+		if err != nil {
+			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
+			http.Error(w, "Failed sing in", http.StatusInternalServerError)
+			return
+		}
 
-		// t, err := jwt.Parse(rawIDToken, func(token *jwt.Token) (any, error) {
-		// 	if kid, ok := token.Header["kid"].(string); ok {
-		// 		jwk, err := jwkStorage.KeyRead(r.Context(), kid)
-		// 		if err != nil {
-		// 			return nil, err
-		// 		}
-		// 		return jwk.Key(), nil
-		// 	}
-
-		// 	return nil, errors.New("kid field not found")
-		// })
+		//TODO write uid to
 	}
 }
 
 func generateState() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		log.Fatal(err)
+		panic(err) //Not expected
 	}
 	return base64.URLEncoding.EncodeToString(b)
 }
