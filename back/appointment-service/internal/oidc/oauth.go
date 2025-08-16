@@ -2,72 +2,49 @@ package oidc
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	common "scheduler/appointment-service/internal"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"golang.org/x/oauth2"
 )
 
 type OAuth2CfgProvider interface {
-	Get() (*oauth2.Config, error)
+	GetOAuth2Cfg() (*oauth2.Config, error)
 }
 
-type OAuth2SignIn interface {
-	Do(token *oauth2.Token) (common.ID, error)
+type UserAuthCheck interface {
+	AuthCheck(token *oauth2.Token) (common.ID, error)
 }
 
-type OAuth2ValidateState struct {
-	S sessions.Store
+type OAuth2ValidateState interface {
+	PrepareState(w http.ResponseWriter, r *http.Request) (string, error)
+	ValidateCallback(w http.ResponseWriter, r *http.Request) error
 }
 
-func (v *OAuth2ValidateState) PrepareState(w http.ResponseWriter, r *http.Request) (string, error) {
-	session, err := v.S.Get(r, "auth-session")
-	if err != nil {
-		return "", fmt.Errorf("session creation fail: %w", err)
-	}
-
-	state := generateState()
-	session.Values["oauth_state"] = state
-
-	err = session.Save(r, w)
-	if err != nil {
-		return "", fmt.Errorf("session saving fail: %w", err)
-	}
-	return state, nil
+type SaveUserCookie interface {
+	Save(id common.ID, w http.ResponseWriter, r *http.Request) error
 }
 
-func (v *OAuth2ValidateState) Validate(w http.ResponseWriter, r *http.Request) error {
-	session, err := v.S.Get(r, "auth-session")
-	if err != nil {
-		return fmt.Errorf("%w: session creation fail: %w", common.ErrInternal, err)
-	}
-
-	//TODO delete oauth_state
-	expectedState, ok := session.Values["oauth_state"].(string)
-	queryState := r.URL.Query().Get("state")
-	if !ok || r.URL.Query().Get("state") != expectedState {
-		return fmt.Errorf("%w : state parameter expected %s, but got %s", common.ErrInvalidArgument, expectedState, queryState)
-	}
-	return nil
+type UserSignIn struct {
+	OAuth2ValidateState
+	OAuth2CfgProvider
+	UserAuthCheck
+	SaveUserCookie
 }
 
-func OAuth2HTTPRedirectHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider) http.HandlerFunc {
+func OAuth2HTTPRedirectHandler(s *UserSignIn) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		oauthConfig, err := cfg.Get()
+		oauthConfig, err := s.GetOAuth2Cfg()
 		if err != nil {
 			slog.ErrorContext(r.Context(), "OAuth2HTTPRedirect get config", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		state, err := v.PrepareState(w, r)
+		state, err := s.PrepareState(w, r)
 		if err != nil {
 			slog.ErrorContext(r.Context(), "OAuth2HTTPRedirect", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -78,9 +55,9 @@ func OAuth2HTTPRedirectHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider) ht
 	}
 }
 
-func OAuth2HTTPUserBackHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider, singIn OAuth2SignIn) http.HandlerFunc {
+func OAuth2HTTPUserBackHandler(s *UserSignIn, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := v.Validate(w, r)
+		err := s.ValidateCallback(w, r)
 		if err != nil {
 			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
 			if errors.Is(err, common.ErrInvalidArgument) {
@@ -90,9 +67,9 @@ func OAuth2HTTPUserBackHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider, si
 			}
 		}
 
-		oauthConfig, err := cfg.Get()
+		oauthConfig, err := s.GetOAuth2Cfg()
 		if err != nil {
-			slog.ErrorContext(r.Context(), "OAuth2UserBack get config", "err", err.Error())
+			slog.ErrorContext(r.Context(), "OAuth2UserBack", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -102,26 +79,29 @@ func OAuth2HTTPUserBackHandler(v *OAuth2ValidateState, cfg OAuth2CfgProvider, si
 		defer cancel()
 		token, err := oauthConfig.Exchange(ctx, code)
 		if err != nil {
-			slog.WarnContext(r.Context(), "OAuth2UserBack get config", "err", err.Error())
+			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
 			http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
 			return
 		}
 
-		uid, err := singIn.Do(token)
+		uid, err := s.AuthCheck(token)
 		if err != nil {
 			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
 			http.Error(w, "Failed sing in", http.StatusInternalServerError)
 			return
 		}
 
-		//TODO write uid to
-	}
-}
+		err = s.Save(uid, w, r)
+		if err != nil {
+			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-func generateState() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(err) //Not expected
+		if next != nil {
+			next.ServeHTTP(w, r)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
 	}
-	return base64.URLEncoding.EncodeToString(b)
 }

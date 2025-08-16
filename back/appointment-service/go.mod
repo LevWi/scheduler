@@ -12,12 +12,16 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/teambition/rrule-go v1.8.2
 	golang.org/x/crypto v0.39.0
+	golang.org/x/oauth2 v0.30.0
 	golang.org/x/time v0.12.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	github.com/MicahParks/jwkset v0.9.6 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/davecgh/go-spew v1.1.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 )
