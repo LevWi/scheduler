@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	common "scheduler/appointment-service/internal"
 	"testing"
 
@@ -27,6 +28,27 @@ func TestCreateUserPassword(t *testing.T) {
 
 	_, err = db.CreateUserPassword(user, password)
 	assert.NoError(t, err)
+}
+
+func TestUserPasswordEmpty(t *testing.T) {
+	db := initDB(t)
+	defer db.Close()
+
+	err := CreateUsersTable(&db)
+	assert.NoError(t, err)
+
+	user := "test_user"
+
+	_, err = db.CreateUserPassword(user, "")
+	assert.Equal(t, ErrEmptyPassword, err)
+
+	_, err = db.CheckUserPassword(user, "")
+	assert.Equal(t, errors.Is(err, common.ErrNotFound), true)
+
+	_, err = db.CreateUserPassword(user, "12345")
+	assert.NoError(t, err)
+	_, err = db.CheckUserPassword(user, "")
+	assert.Equal(t, ErrEmptyPassword, err)
 }
 
 func TestCheckUserPassword(t *testing.T) {
