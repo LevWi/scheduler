@@ -131,7 +131,7 @@ type User struct {
 // TODO add context?
 func adjustDbError(e error) error {
 	if e == nil {
-		return e
+		return nil
 	}
 	if errors.Is(e, sql.ErrNoRows) {
 		e = common.ErrNotFound

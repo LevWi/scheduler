@@ -2,7 +2,10 @@ package storage
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
 	common "scheduler/appointment-service/internal"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -23,33 +26,38 @@ func CreateOIDCTable(db *Storage) error {
 }
 
 type OIDCData struct {
-	UserName string
 	Provider string
 	Subject  string
 }
 
-func (db *Storage) OIDCCreateUser(in OIDCData) (UserID, error) {
-	//TODO
-	id := uuid.NewString()
-	if in.UserName == "" { //Can UserName be null in "user" table?
-		in.UserName = id
-	}
+func (d OIDCData) IsValid() bool {
+	return d.Provider != "" && d.Subject != ""
 
-	if in.Provider == "" || in.Subject == "" {
+}
+
+// TODO move it
+func GenerateUsername() string {
+	return fmt.Sprintf("user_%x_%d", rand.Uint64(), time.Now().Unix())
+}
+
+// TODO need algorithm for names collision
+func (db *Storage) OIDCCreateUser(userName string, in OIDCData) (UserID, error) {
+	if userName == "" || !in.IsValid() {
 		return "", common.ErrInvalidArgument
 	}
 
+	id := uuid.NewString()
 	tx, err := db.Begin()
 	if err != nil {
 		return "", adjustDbError(err)
 	}
 
-	_, err = tx.Exec("INSERT INTO users (id, username) VALUES ($1, $2)", id, in.UserName)
+	_, err = tx.Exec("INSERT INTO users (id, username) VALUES ($1, $2)", id, userName)
 	if err != nil {
 		goto Rollback
 	}
 
-	_, err = db.Exec("INSERT INTO user_oidc (user_id, provider, subject) VALUES ($1, $2, $3)", id, in.Provider, in.Subject)
+	_, err = tx.Exec("INSERT INTO user_oidc (user_id, provider, subject) VALUES ($1, $2, $3)", id, in.Provider, in.Subject)
 	if err != nil {
 		goto Rollback
 	}
@@ -66,4 +74,45 @@ Rollback:
 		err = errors.Join(err, tx.Rollback())
 	}
 	return "", adjustDbError(err)
+}
+
+func (db *Storage) OIDCPairWithUser(uid UserID, in OIDCData) error {
+	if uid == "" || !in.IsValid() {
+		return common.ErrInvalidArgument
+	}
+
+	_, err := db.Exec("INSERT INTO user_oidc (user_id, provider, subject) VALUES ($1, $2, $3)", uid, in.Provider, in.Subject)
+	if err != nil {
+		return adjustDbError(err)
+	}
+
+	return nil
+}
+
+func (db *Storage) OIDCUnPairUser(uid UserID, in OIDCData) error {
+	if uid == "" || !in.IsValid() {
+		return common.ErrInvalidArgument
+	}
+
+	_, err := db.Exec("DELETE FROM user_oidc WHERE user_id = $1 AND provider = $2 AND subject = $3", uid, in.Provider, in.Subject)
+	if err != nil {
+		return adjustDbError(err)
+	}
+
+	return nil
+}
+
+func (db *Storage) OIDCUserAuth(in OIDCData) (UserID, error) {
+	if !in.IsValid() {
+		return "", common.ErrInvalidArgument
+	}
+
+	var userID UserID
+	err := db.Get(&userID, "SELECT user_id FROM user_oidc WHERE provider = $1 AND subject = $2", in.Provider, in.Subject)
+	if err != nil {
+		return "", adjustDbError(err)
+	}
+
+	return userID, nil
+
 }
