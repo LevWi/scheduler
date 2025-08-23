@@ -15,11 +15,9 @@ type OAuth2SessionsValidator struct {
 }
 
 func generateState() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic(err) //Not expected
-	}
-	return base64.URLEncoding.EncodeToString(b)
+	var b [16]byte
+	rand.Read(b[:]) //Error not expected
+	return base64.URLEncoding.EncodeToString(b[:])
 }
 
 // TODO accept only one of request with same cookie ?

@@ -16,7 +16,7 @@ type OAuth2CfgProvider interface {
 }
 
 type UserAuthCheck interface {
-	AuthCheck(token *oauth2.Token) (common.ID, error)
+	AuthCheck(ctx context.Context, token *oauth2.Token) (id common.ID, isNew bool, err error)
 }
 
 type OAuth2ValidateState interface {
@@ -55,6 +55,7 @@ func OAuth2HTTPRedirectHandler(s *UserSignIn) http.HandlerFunc {
 	}
 }
 
+// TODO How to handle new user? see AuthCheck()
 func OAuth2HTTPUserBackHandler(s *UserSignIn, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := s.ValidateCallback(w, r)
@@ -84,7 +85,7 @@ func OAuth2HTTPUserBackHandler(s *UserSignIn, next http.Handler) http.HandlerFun
 			return
 		}
 
-		uid, err := s.AuthCheck(token)
+		uid, _, err := s.AuthCheck(r.Context(), token)
 		if err != nil {
 			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
 			http.Error(w, "Failed sing in", http.StatusInternalServerError)
