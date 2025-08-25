@@ -10,15 +10,19 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-type UserCookieStore struct {
+type UserSessionStore struct {
 	S sessions.Store
 	O []AuthCheckOptions
 }
 
 type AuthCheckOptions func(*sessions.Session) error
 
-func (s *UserCookieStore) Save(id common.ID, w http.ResponseWriter, r *http.Request) error {
-	session, err := s.S.Get(r, CookieUserSessionName)
+func (s *UserSessionStore) Get(r *http.Request) (*sessions.Session, error) {
+	return s.S.Get(r, CookieUserSessionName)
+}
+
+func (s *UserSessionStore) Save(id common.ID, w http.ResponseWriter, r *http.Request) error {
+	session, err := s.Get(r)
 	if err != nil {
 		return fmt.Errorf("[Save] get session: %w", err)
 	}
@@ -33,21 +37,35 @@ func (s *UserCookieStore) Save(id common.ID, w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-func (s *UserCookieStore) AuthCheck(r *http.Request) (common.ID, error) {
-	session, err := s.S.Get(r, CookieUserSessionName)
+func (s *UserSessionStore) Reset(w http.ResponseWriter, r *http.Request) error {
+	session, err := s.Get(r)
 	if err != nil {
-		return "", fmt.Errorf("[AuthCheck] get session: %w", err)
+		return fmt.Errorf("[Reset] get session: %w", err)
+	}
+
+	delete(session.Values, CookieKeyUserID)
+	err = session.Save(r, w)
+	if err != nil {
+		return fmt.Errorf("[Reset] save session: %w", err)
+	}
+	return nil
+}
+
+func (s *UserSessionStore) Check(r *http.Request) (common.ID, error) {
+	session, err := s.Get(r)
+	if err != nil {
+		return "", fmt.Errorf("[Check] get session: %w", err)
 	}
 
 	uid, ok := session.Values[CookieKeyUserID].(string)
 	if !ok {
-		return "", fmt.Errorf("[AuthCheck] %s %w", CookieKeyUserID, common.ErrNotFound)
+		return "", fmt.Errorf("%w: [Check] %s not found", common.ErrUnauthorized, CookieKeyUserID)
 	}
 
 	for _, opt := range s.O {
 		err := opt(session)
 		if err != nil {
-			return "", fmt.Errorf("[AuthCheck] option check fail: %w", err)
+			return "", fmt.Errorf("[Check] option check fail: %w", err)
 		}
 	}
 
