@@ -12,12 +12,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type UserAuthCheckImpl struct {
+type OIDCAuthCheckImpl struct {
 	s          storage.Storage
 	jwkStorage jwkset.Storage
 }
 
-func (c *UserAuthCheckImpl) AuthCheck(ctx context.Context, token *oauth2.Token) (id common.ID, isNew bool, err error) {
+func (c *OIDCAuthCheckImpl) AuthCheck(ctx context.Context, token *oauth2.Token) (id common.ID, isNew bool, err error) {
 	if token == nil {
 		err = common.ErrInvalidArgument
 		return
@@ -68,8 +68,8 @@ func claimsCheck(v string, err error) (string, error) {
 	return v, nil
 }
 
-func (c *UserAuthCheckImpl) verifyOIDCToken(ctx context.Context, token *oauth2.Token) (*jwt.Token, error) {
-	rawIDToken, ok := token.Extra("id_token").(string)
+func (c *OIDCAuthCheckImpl) verifyOIDCToken(ctx context.Context, token *oauth2.Token) (*jwt.Token, error) {
+	rawIDToken, ok := token.Extra("id_token").(string) // TODO check if it only for Google ?
 	if !ok {
 		return nil, fmt.Errorf("%w: id_token not found", common.ErrInvalidArgument)
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 type OAuth2SessionsValidator struct {
-	S sessions.Store //session need to be short live
+	s sessions.Store
 }
 
 func generateState() string {
@@ -21,13 +21,15 @@ func generateState() string {
 }
 
 // TODO accept only one of request with same cookie ?
+// TODO session need to be short live
 func (v *OAuth2SessionsValidator) PrepareState(w http.ResponseWriter, r *http.Request) (string, error) {
-	session, err := v.S.Get(r, "auth-session")
+	session, err := v.s.Get(r, "auth-session")
 	if err != nil {
 		return "", fmt.Errorf("session creation fail: %w", err)
 	}
 
 	state := generateState()
+	//TODO make session short lived?
 	session.Values["oauth_state"] = state
 
 	err = session.Save(r, w)
@@ -38,14 +40,20 @@ func (v *OAuth2SessionsValidator) PrepareState(w http.ResponseWriter, r *http.Re
 }
 
 func (v *OAuth2SessionsValidator) ValidateCallback(w http.ResponseWriter, r *http.Request) error {
-	session, err := v.S.Get(r, "auth-session")
+	session, err := v.s.Get(r, "auth-session")
 	if err != nil {
 		return fmt.Errorf("%w: session creation fail: %w", common.ErrInternal, err)
 	}
 
-	//TODO delete oauth_state
 	expectedState, ok := session.Values["oauth_state"].(string)
 	queryState := r.URL.Query().Get("state")
+
+	session.Options.MaxAge = -1
+	err = session.Save(r, w)
+	if err != nil {
+		return fmt.Errorf("deleting auth session: %w", err)
+	}
+
 	if !ok || r.URL.Query().Get("state") != expectedState {
 		return fmt.Errorf("%w : state parameter expected %s, but got %s", common.ErrInvalidArgument, expectedState, queryState)
 	}

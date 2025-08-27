@@ -88,3 +88,10 @@ func WithSessionLifeTime(d time.Duration) AuthCheckOptions {
 		return nil
 	}
 }
+
+func NewUserSessionStore(s sessions.Store, opts ...AuthCheckOptions) *UserSessionStore {
+	return &UserSessionStore{
+		S: s,
+		O: opts,
+	}
+}

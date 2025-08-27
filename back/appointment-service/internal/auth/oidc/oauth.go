@@ -15,7 +15,7 @@ type OAuth2CfgProvider interface {
 	GetOAuth2Cfg() (*oauth2.Config, error)
 }
 
-type UserAuthCheck interface {
+type OIDCAuthCheck interface {
 	AuthCheck(ctx context.Context, token *oauth2.Token) (id common.ID, isNew bool, err error)
 }
 
@@ -31,7 +31,7 @@ type SaveUserCookie interface {
 type UserSignIn struct {
 	OAuth2ValidateState
 	OAuth2CfgProvider
-	UserAuthCheck
+	OIDCAuthCheck
 	SaveUserCookie
 }
 

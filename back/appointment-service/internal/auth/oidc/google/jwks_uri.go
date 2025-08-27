@@ -20,12 +20,12 @@ func FetchGoogleJWKsUri(ctx context.Context) (string, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("http request err: %w", err)
+		return "", fmt.Errorf("[FetchGoogleJWKsUri] http request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
-		return "", fmt.Errorf("http body decoding err: %w", err)
+		return "", fmt.Errorf("[FetchGoogleJWKsUri] http body decoding: %w", err)
 	}
 
 	return cfg.JwksURI, nil
