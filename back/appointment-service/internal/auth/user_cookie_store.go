@@ -10,40 +10,52 @@ import (
 	"github.com/gorilla/sessions"
 )
 
+var (
+	StatusAuthenticated = "authenticated"
+	Status2faRequired   = "2fa_required"
+
+	CookieUserSessionName = "sid"
+	CookieKeyUserID       = "uid"
+	CookieKeyAuthStatus   = "auth_stat"
+	CookieKeyTimestamp    = "ts"
+)
+
 type UserSessionStore struct {
 	S sessions.Store
 	O []AuthCheckOptions
 }
 
-type AuthCheckOptions func(*sessions.Session) error
+type AuthCheckOptions func(*UserSession) error
 
-func (s *UserSessionStore) Get(r *http.Request) (*sessions.Session, error) {
-	return s.S.Get(r, CookieUserSessionName)
+type UserSession struct {
+	*sessions.Session
 }
 
-func (s *UserSessionStore) Save(id common.ID, w http.ResponseWriter, r *http.Request) error {
-	session, err := s.Get(r)
-	if err != nil {
-		return fmt.Errorf("[Save] get session: %w", err)
+func NewUserSessionStore(s sessions.Store, opts ...AuthCheckOptions) *UserSessionStore {
+	return &UserSessionStore{
+		S: s,
+		O: opts,
 	}
-
-	session.Values[CookieKeyUserID] = string(id)
-	session.Values[CookieKeyTimestamp] = time.Now().Unix()
-	err = s.S.Save(r, w, session)
-	if err != nil {
-		return fmt.Errorf("[Save] save session: %w", err)
-	}
-
-	return nil
 }
 
-func (s *UserSessionStore) Reset(w http.ResponseWriter, r *http.Request) error {
-	session, err := s.Get(r)
+func (us *UserSessionStore) Authenticate(id common.ID, w http.ResponseWriter, r *http.Request) error {
+	session, err := us.Get(r)
+	if err != nil {
+		return fmt.Errorf("[Authenticate] get session: %w", err)
+	}
+
+	return session.Authenticate(id, w, r)
+}
+
+func (us *UserSessionStore) Reset(w http.ResponseWriter, r *http.Request) error {
+	session, err := us.Get(r)
 	if err != nil {
 		return fmt.Errorf("[Reset] get session: %w", err)
 	}
 
-	delete(session.Values, CookieKeyUserID)
+	session.Options.MaxAge = -1 // Delete login cookie
+	session.DelUserID()
+	session.DelAuthStatus()
 	err = session.Save(r, w)
 	if err != nil {
 		return fmt.Errorf("[Reset] save session: %w", err)
@@ -51,34 +63,34 @@ func (s *UserSessionStore) Reset(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *UserSessionStore) Check(r *http.Request) (common.ID, error) {
-	session, err := s.Get(r)
+func (us *UserSessionStore) AuthenticationCheck(r *http.Request) (common.ID, error) {
+	session, err := us.Get(r)
 	if err != nil {
-		return "", fmt.Errorf("[Check] get session: %w", err)
+		return "", fmt.Errorf("[AuthenticationCheck] get session: %w", err)
 	}
 
-	uid, ok := session.Values[CookieKeyUserID].(string)
-	if !ok {
-		return "", fmt.Errorf("%w: [Check] %s not found", common.ErrUnauthorized, CookieKeyUserID)
+	uid, err := session.GetUserID()
+	if err != nil {
+		return "", fmt.Errorf("[AuthenticationCheck]: %w", err)
 	}
 
-	for _, opt := range s.O {
+	for _, opt := range us.O {
 		err := opt(session)
 		if err != nil {
-			return "", fmt.Errorf("[Check] option check fail: %w", err)
+			return "", fmt.Errorf("[AuthenticationCheck] option check fail: %w", err)
 		}
 	}
 
 	return common.ID(uid), nil
 }
 
-var ErrSessionExpired = errors.New("session expired")
+var ErrSessionExpired = errors.Join(errors.New("session expired"), common.ErrUnauthorized)
 
 func WithSessionLifeTime(d time.Duration) AuthCheckOptions {
-	return func(s *sessions.Session) error {
-		tp, ok := s.Values[CookieKeyTimestamp].(int64)
-		if !ok {
-			return fmt.Errorf("[WithSessionLifeTime] %s %w", CookieKeyTimestamp, common.ErrNotFound)
+	return func(s *UserSession) error {
+		tp, err := s.GetTimeStamp()
+		if err != nil {
+			return err
 		}
 
 		if time.Since(time.Unix(tp, 0)) > d {
@@ -89,9 +101,71 @@ func WithSessionLifeTime(d time.Duration) AuthCheckOptions {
 	}
 }
 
-func NewUserSessionStore(s sessions.Store, opts ...AuthCheckOptions) *UserSessionStore {
-	return &UserSessionStore{
-		S: s,
-		O: opts,
+func WithAuthStatusCheck() AuthCheckOptions {
+	return func(s *UserSession) error {
+		status, err := s.GetAuthStatus()
+		if err != nil {
+			return err
+		}
+
+		if status != StatusAuthenticated {
+			return common.ErrUnauthorized
+		}
+
+		return nil
 	}
+}
+
+func (us *UserSessionStore) Get(r *http.Request) (*UserSession, error) {
+	sp, e := us.S.Get(r, CookieUserSessionName)
+	return &UserSession{sp}, e
+}
+
+func (s *UserSession) SetUserID(id common.ID) {
+	s.Values[CookieKeyUserID] = string(id)
+	s.Values[CookieKeyTimestamp] = time.Now().Unix()
+}
+
+func (s *UserSession) DelUserID() {
+	delete(s.Values, CookieKeyUserID)
+	delete(s.Values, CookieKeyTimestamp)
+}
+
+func GetKey[Type any](s *sessions.Session, key string) (Type, error) {
+	v, ok := s.Values[key].(Type)
+	if !ok {
+		return v, fmt.Errorf("[Session] key %s %w", key, common.ErrNotFound)
+	}
+	return v, nil
+}
+
+func (s *UserSession) GetUserID() (common.ID, error) {
+	return GetKey[string](s.Session, CookieKeyUserID)
+}
+
+func (s *UserSession) GetTimeStamp() (int64, error) {
+	return GetKey[int64](s.Session, CookieKeyTimestamp)
+}
+
+func (s *UserSession) GetAuthStatus() (string, error) {
+	return GetKey[string](s.Session, CookieKeyAuthStatus)
+}
+
+func (s *UserSession) SetAuthStatus(status string) {
+	s.Values[CookieKeyAuthStatus] = status
+}
+
+func (s *UserSession) DelAuthStatus() {
+	delete(s.Values, CookieKeyAuthStatus)
+}
+
+func (s *UserSession) Authenticate(id common.ID, w http.ResponseWriter, r *http.Request) error {
+	s.SetUserID(id)
+	s.SetAuthStatus(StatusAuthenticated)
+	err := s.Save(r, w)
+	if err != nil {
+		return fmt.Errorf("[Authenticate] save session: %w", err)
+	}
+
+	return nil
 }

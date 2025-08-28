@@ -25,7 +25,7 @@ type OAuth2ValidateState interface {
 }
 
 type SaveUserCookie interface {
-	Save(id common.ID, w http.ResponseWriter, r *http.Request) error
+	Authenticate(id common.ID, w http.ResponseWriter, r *http.Request) error
 }
 
 type UserSignIn struct {
@@ -92,7 +92,7 @@ func OAuth2HTTPUserBackHandler(s *UserSignIn, next http.Handler) http.HandlerFun
 			return
 		}
 
-		err = s.Save(uid, w, r)
+		err = s.Authenticate(uid, w, r)
 		if err != nil {
 			slog.WarnContext(r.Context(), "OAuth2UserBack", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

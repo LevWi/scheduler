@@ -3,15 +3,14 @@ package server
 import (
 	"log/slog"
 	"net/http"
-	common "scheduler/appointment-service/internal"
+	auth "scheduler/appointment-service/internal/auth"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
 
-const kLoginTimeOut = int64(45)
+const kLoginTimeOut = 45 * time.Second
 
 func GenerateOTPKeyBasic(login, company string) (*otp.Key, error) {
 	return totp.Generate(totp.GenerateOpts{
@@ -42,7 +41,7 @@ func GenerateOTPKey(secretStore OTPSecretGetter) http.HandlerFunc {
 
 // Required application/x-www-form-urlencoded format
 // Expected POST method
-func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretGetter) http.HandlerFunc {
+func ValidateOTPassword(sesStore *auth.UserSessionStore, secretStore OTPSecretGetter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
@@ -58,31 +57,31 @@ func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretGetter) ht
 			return
 		}
 
-		s, err := sesStore.Get(r, UserSessionName)
+		s, err := sesStore.Get(r)
 		if err != nil {
 			slog.ErrorContext(r.Context(), "[ValidateOTPassword] session", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		if status, ok := s.Values[KeyAuthStatus].(string); !ok {
-			slog.ErrorContext(r.Context(), "[ValidateOTPassword] KeyAuthStatus not found")
+		if status, err := s.GetAuthStatus(); err != nil {
+			slog.ErrorContext(r.Context(), "[ValidateOTPassword]", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
-		} else if status == StatusAuthorized {
+		} else if status == auth.StatusAuthenticated {
 			slog.WarnContext(r.Context(), "[ValidateOTPassword] already authorized")
 			http.Error(w, "already authorized?", http.StatusBadRequest)
-		} else if status != Status2faRequired {
+		} else if status != auth.Status2faRequired {
 			slog.WarnContext(r.Context(), "[ValidateOTPassword]", "unexpected status", status)
 			http.Error(w, "login step missed?", http.StatusUnauthorized)
 			return
 		}
 
-		if ts, ok := s.Values[KeyTimestamp].(int64); !ok {
-			slog.ErrorContext(r.Context(), "[ValidateOTPassword] KeyTimestamp not found")
+		if tp, err := s.GetTimeStamp(); err != nil {
+			slog.ErrorContext(r.Context(), "[ValidateOTPassword]", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
-		} else if (common.TsSec(time.Now()) - ts) > kLoginTimeOut {
+		} else if time.Since(time.Unix(tp, 0)) > kLoginTimeOut {
 			slog.DebugContext(r.Context(), "[ValidateOTPassword] Timeout")
 
 			s.Options.MaxAge = -1
@@ -94,9 +93,9 @@ func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretGetter) ht
 			return
 		}
 
-		uid, ok := s.Values[KeyUserID].(string)
-		if !ok {
-			slog.ErrorContext(r.Context(), "[ValidateOTPassword] uid not found")
+		uid, err := s.GetUserID()
+		if err != nil {
+			slog.ErrorContext(r.Context(), "[ValidateOTPassword]", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -114,20 +113,7 @@ func ValidateOTPassword(sesStore sessions.Store, secretStore OTPSecretGetter) ht
 			return
 		}
 
-		s.Options.MaxAge = -1 // Delete login cookie
-
-		s, err = sesStore.Get(r, UserSessionName)
-		if err != nil {
-			slog.ErrorContext(r.Context(), "[ValidateOTPassword] user session", "err", err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		s.Values[KeyUserID] = uid
-		s.Values[KeyAuthStatus] = StatusAuthorized
-		delete(s.Values, KeyTimestamp)
-
-		err = s.Save(r, w)
+		err = sesStore.Authenticate(uid, w, r)
 		if err != nil {
 			slog.ErrorContext(r.Context(), "[ValidateOTPassword] session", "err", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
