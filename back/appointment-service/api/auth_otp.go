@@ -10,7 +10,7 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-const kLoginTimeOut = 45 * time.Second
+const kLoginTimeOut = 2 * time.Minute
 
 func GenerateOTPKeyBasic(login, company string) (*otp.Key, error) {
 	return totp.Generate(totp.GenerateOpts{
@@ -84,8 +84,7 @@ func ValidateOTPassword(sesStore *auth.UserSessionStore, secretStore OTPSecretGe
 		} else if time.Since(time.Unix(tp, 0)) > kLoginTimeOut {
 			slog.DebugContext(r.Context(), "[ValidateOTPassword] Timeout")
 
-			s.Options.MaxAge = -1
-			err = s.Save(r, w)
+			err = sesStore.Reset(w, r)
 			if err != nil {
 				slog.ErrorContext(r.Context(), "[ValidateOTPassword] session", "err", err.Error())
 			}

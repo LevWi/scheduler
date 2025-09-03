@@ -13,7 +13,7 @@ import (
 )
 
 type OIDCAuthCheckImpl struct {
-	s          storage.Storage
+	s          *storage.Storage
 	jwkStorage jwkset.Storage
 }
 

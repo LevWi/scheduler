@@ -38,7 +38,7 @@ func NewUserSessionStore(s sessions.Store, opts ...AuthCheckOptions) *UserSessio
 	}
 }
 
-func (us *UserSessionStore) Authenticate(id common.ID, w http.ResponseWriter, r *http.Request) error {
+func (us *UserSessionStore) Authenticate(id UserID, w http.ResponseWriter, r *http.Request) error {
 	session, err := us.Get(r)
 	if err != nil {
 		return fmt.Errorf("[Authenticate] get session: %w", err)
@@ -121,7 +121,7 @@ func (us *UserSessionStore) Get(r *http.Request) (*UserSession, error) {
 	return &UserSession{sp}, e
 }
 
-func (s *UserSession) SetUserID(id common.ID) {
+func (s *UserSession) SetUserID(id UserID) {
 	s.Values[CookieKeyUserID] = string(id)
 	s.Values[CookieKeyTimestamp] = time.Now().Unix()
 }
@@ -159,7 +159,7 @@ func (s *UserSession) DelAuthStatus() {
 	delete(s.Values, CookieKeyAuthStatus)
 }
 
-func (s *UserSession) Authenticate(id common.ID, w http.ResponseWriter, r *http.Request) error {
+func (s *UserSession) Authenticate(id UserID, w http.ResponseWriter, r *http.Request) error {
 	s.SetUserID(id)
 	s.SetAuthStatus(StatusAuthenticated)
 	err := s.Save(r, w)

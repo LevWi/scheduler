@@ -9,7 +9,8 @@ import (
 	auth "scheduler/appointment-service/internal/auth"
 )
 
-type UserID = common.ID //TODO names conflict
+type UserID = common.ID
+
 type UserIdKey struct{}
 
 var ErrSecurityRestriction = errors.New("security restriction")
@@ -24,12 +25,12 @@ type AuthUserCheck interface {
 
 func GetUserID(c context.Context) (UserID, bool) {
 	uid, ok := c.Value(UserIdKey{}).(string)
-	return uid, ok
+	return UserID(uid), ok
 }
 
 // Required application/x-www-form-urlencoded format
 // TODO add Request Throttling , CSRF Protection
-func LoginHandler(ses *auth.UserSessionStore, ac AuthUserCheck) http.HandlerFunc {
+func PasswordLoginHandler(ses *auth.UserSessionStore, ac AuthUserCheck) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			slog.WarnContext(r.Context(), "wrong method")

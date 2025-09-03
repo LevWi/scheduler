@@ -5,9 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	server "scheduler/appointment-service/api"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/auth"
 	"scheduler/appointment-service/internal/storage"
 
 	"github.com/gorilla/sessions"
@@ -30,11 +32,15 @@ func main() {
 	defer db.Close()
 
 	sessionStore := sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
-	sessionStore.MaxAge(85400 * 5) // 5 days
+	sessionStore.MaxAge(86400 * 5) // 5 days
 
-	storage := storage.Storage{DB: db}
+	strg := &storage.Storage{DB: db}
+	storage.CreateOIDCTable(strg)
+	storage.CreateUsersTable(strg)
 
-	router := server.NewRouter(storage, sessionStore)
+	userSessionStore := auth.NewUserSessionStore(sessionStore, auth.WithAuthStatusCheck(), auth.WithSessionLifeTime(time.Hour*24*5))
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	router := server.NewRouter(strg, userSessionStore)
+
+	log.Fatal(http.ListenAndServe(":8080", router)) //TODO
 }

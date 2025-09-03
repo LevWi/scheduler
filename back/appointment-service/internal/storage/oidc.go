@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+type UserID = common.ID
+
 const createOIDCTable = `CREATE TABLE IF NOT EXISTS user_oidc (
     user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL,

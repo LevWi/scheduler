@@ -9,7 +9,7 @@ import (
 	db "scheduler/appointment-service/internal/storage"
 )
 
-func NewOIDCAuthCheckDefault(ctx context.Context, dbase db.Storage) (OIDCAuthCheck, error) {
+func NewOIDCAuthCheckDefault(ctx context.Context, dbase *db.Storage) (OIDCAuthCheck, error) {
 	//TODO make it with periodically update?
 	url, err := google.FetchGoogleJWKsUri(ctx)
 	if err != nil {

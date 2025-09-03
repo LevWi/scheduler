@@ -23,8 +23,6 @@ const createUsersTable = `CREATE TABLE IF NOT EXISTS users (
 
 //TODO need updated_at handling
 
-type UserID common.ID
-
 func CreateUsersTable(db *Storage) error {
 	_, err := db.Exec(createUsersTable)
 	if err != nil {

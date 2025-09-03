@@ -18,6 +18,9 @@ func NewOAuth2CfgProviderFromFile(file string, scope ...string) (OAuth2CfgCacheP
 		return OAuth2CfgCacheProvider{}, fmt.Errorf("read oauth2 cfg file: %w", err)
 	}
 
+	if len(scope) == 0 {
+		scope = []string{"openid"}
+	}
 	cfg, err := google.ConfigFromJSON(raw, scope...)
 	if err != nil {
 		return OAuth2CfgCacheProvider{}, fmt.Errorf("parse oauth2 cfg file: %w", err)
