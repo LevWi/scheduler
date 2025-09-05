@@ -71,6 +71,9 @@ func (us *UserSessionStore) AuthenticationCheck(r *http.Request) (common.ID, err
 
 	uid, err := session.GetUserID()
 	if err != nil {
+		if errors.Is(err, common.ErrNotFound) {
+			err = errors.Join(common.ErrUnauthorized, err)
+		}
 		return "", fmt.Errorf("[AuthenticationCheck]: %w", err)
 	}
 

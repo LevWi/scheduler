@@ -97,15 +97,13 @@ func LogoutHandler(store *auth.UserSessionStore) http.HandlerFunc {
 	}
 }
 
-func CheckAuthHandler(store *auth.UserSessionStore, uc ExistingUserCheck, next http.Handler) http.HandlerFunc {
+func CheckAuthHandler(store *auth.UserSessionStore, uc ExistingUserCheck, next http.Handler, noAuth http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, err := store.AuthenticationCheck(r)
 
 		if err != nil {
 			if errors.Is(err, common.ErrUnauthorized) {
-				slog.WarnContext(r.Context(), "[CheckAuthHandler]", "err", err.Error())
-				w.WriteHeader(http.StatusNetworkAuthenticationRequired)
-				return
+				goto noAuthHandler
 			}
 			slog.WarnContext(r.Context(), "[CheckAuthHandler] unexpected", "err", err.Error())
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -115,19 +113,28 @@ func CheckAuthHandler(store *auth.UserSessionStore, uc ExistingUserCheck, next h
 		//TODO can we avoid it in the next steps by erasing uid field?
 		err = uc.IsExist(uid)
 
-		if err == common.ErrNotFound {
-			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
-			return
-		}
-
 		if err != nil {
+			if errors.Is(err, common.ErrNotFound) {
+				goto noAuthHandler
+			}
 			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserIdKey{}, uid)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserIdKey{}, uid)))
+		return
+
+	noAuthHandler:
+		err = store.Reset(w, r)
+		if noAuth != nil {
+			noAuth.ServeHTTP(w, r)
+			return
+		}
+		if err != nil {
+			slog.WarnContext(r.Context(), "[CheckAuthHandler]", "err", err.Error())
+		}
+		w.WriteHeader(http.StatusNetworkAuthenticationRequired)
 	}
 }
 

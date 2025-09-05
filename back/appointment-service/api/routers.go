@@ -25,6 +25,7 @@ type Route struct {
 
 type Routes []Route
 
+// TODO need to cache IsExist(uid) result with periodic update. With mutex
 type userCheckWrap struct {
 	*storage.Storage
 	table *common.LimitsTable[string]
@@ -59,6 +60,7 @@ func NewUserSignIn(storage *storage.Storage, sesStore *auth.UserSessionStore) (*
 	}, nil
 }
 
+// TODO need more logs
 func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 
@@ -82,7 +84,7 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"Index",
 			"GET",
 			"/",
-			Index,
+			CheckAuthHandler(sesStore, userCheck, http.HandlerFunc(Index), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"SlotsBusinessIdGet",
@@ -119,13 +121,13 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"Logout",
 			"POST",
 			"/logout",
-			CheckAuthHandler(sesStore, userCheck, LogoutHandler(sesStore)),
+			CheckAuthHandler(sesStore, userCheck, LogoutHandler(sesStore), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			CheckAuthHandler(sesStore, userCheck, DeleteUserHandler(sesStore, storage.DeleteUserWithCheck)),
+			CheckAuthHandler(sesStore, userCheck, DeleteUserHandler(sesStore, storage.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
 		},
 	}
 
@@ -145,5 +147,10 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello World!")
+	fmt.Fprintf(w, "Authentication success")
+}
+
+func LoginRequired(w http.ResponseWriter, r *http.Request) {
+	slog.WarnContext(r.Context(), "[LoginRequired]", "RemoteAddr", r.RemoteAddr)
+	http.Error(w, "Please login first", http.StatusNetworkAuthenticationRequired)
 }
