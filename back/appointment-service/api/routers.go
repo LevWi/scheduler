@@ -71,6 +71,7 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 		}))
 
 	userCheck := userCheckWrap{storage, restrictionTable}
+	ruleStorage := rruleStorage{storage}
 
 	oidcUserSignIn, err := NewUserSignIn(storage, sesStore)
 	if err != nil {
@@ -97,6 +98,24 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"POST",
 			"/slots/{business_id}",
 			SlotsBusinessIdPostFunc(storage),
+		},
+		Route{
+			"AddBusinessRulePost",
+			"POST",
+			"/rrules",
+			CheckAuthHandler(sesStore, userCheck, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+		},
+		Route{
+			"GetBusinessRule",
+			"GET",
+			"/rrules",
+			CheckAuthHandler(sesStore, userCheck, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+		},
+		Route{
+			"DelBusinessRule",
+			"DELETE",
+			"/rrules/{id}",
+			CheckAuthHandler(sesStore, userCheck, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		// Route{
 		// 	"Login",
