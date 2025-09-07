@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create IntervalRRule</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, select, button {
+      padding: 8px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 15px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover:enabled {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    .invalid {
+      border: 2px solid red;
+      background: #ffe5e5;
+    }
+    .hint {
+      font-size: 12px;
+      color: #555;
+      margin-top: 2px;
+      font-family: monospace;
+    }
+    .rrule-preview {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      font-family: monospace;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Create IntervalRRule</h2>
+
+  <form id="rrule-form">
+    <label for="freq">Frequency:</label>
+    <select id="freq" required>
+      <option value="DAILY">Daily</option>
+      <option value="WEEKLY">Weekly</option>
+      <option value="MONTHLY">Monthly</option>
+      <option value="YEARLY">Yearly</option>
+    </select>
+
+    <label for="interval">Interval:</label>
+    <input type="number" id="interval" value="1" min="1" required>
+
+    <label for="count">Count:</label>
+    <input type="number" id="count" min="1">
+
+    <label for="dtstart">Start date:</label>
+    <input type="date" id="dtstart">
+
+    <label for="until">Until date:</label>
+    <input type="date" id="until">
+
+    <label for="len">Length (e.g. 1d2h30m15s):</label>
+    <input type="text" id="len" placeholder="1h30m" value="1h" required>
+    <div id="len-hint" class="hint">= 3600s</div>
+
+    <label for="type">Interval type:</label>
+    <select id="type" required>
+      <option value="Inclusion">Inclusion</option>
+      <option value="Exclusion">Exclusion</option>
+    </select>
+
+    <label>Current RRule:</label>
+    <div id="rrule-preview" class="rrule-preview">—</div>
+
+    <button type="submit" id="submit-btn">Create</button>
+  </form>
+
+  <h3>Generated JSON</h3>
+  <pre id="output"></pre>
+
+  <script>
+    const form = document.getElementById("rrule-form");
+    const output = document.getElementById("output");
+    const preview = document.getElementById("rrule-preview");
+    const lenInput = document.getElementById("len");
+    const lenHint = document.getElementById("len-hint");
+    const submitBtn = document.getElementById("submit-btn");
+
+    function buildRRule(freq, interval, dtstart, until, count) {
+      let parts = [`FREQ=${freq}`, `INTERVAL=${interval}`];
+      if (count) parts.push(`COUNT=${count}`);
+      if (dtstart) parts.push(`DTSTART=${dtstart.replace(/-/g, '')}T000000Z`);
+      if (until) parts.push(`UNTIL=${until.replace(/-/g, '')}T235959Z`);
+      return parts.join(";");
+    }
+
+    function parseDuration(str) {
+      const regex = /(\d+)([dhms])/g;
+      let match, total = 0;
+      while ((match = regex.exec(str)) !== null) {
+        const value = parseInt(match[1], 10);
+        switch (match[2]) {
+          case "d": total += value * 86400; break;
+          case "h": total += value * 3600; break;
+          case "m": total += value * 60; break;
+          case "s": total += value; break;
+        }
+      }
+      return total;
+    }
+
+    function isValidDuration(str) {
+      return /^(\d+[dhms])+$/.test(str);
+    }
+
+    function updatePreview() {
+      const freq = document.getElementById("freq").value;
+      const interval = document.getElementById("interval").value;
+      const count = document.getElementById("count").value;
+      const dtstart = document.getElementById("dtstart").value;
+      const until = document.getElementById("until").value;
+
+      preview.textContent = buildRRule(freq, interval, dtstart, until, count);
+    }
+
+    function validateLength() {
+      const val = lenInput.value.trim();
+      if (!isValidDuration(val)) {
+        lenInput.classList.add("invalid");
+        lenHint.textContent = "Invalid format";
+        submitBtn.disabled = true;
+      } else {
+        lenInput.classList.remove("invalid");
+        const seconds = parseDuration(val);
+        lenHint.textContent = `= ${seconds}s`;
+        submitBtn.disabled = false;
+      }
+    }
+
+    lenInput.addEventListener("input", validateLength);
+    form.addEventListener("input", updatePreview);
+    form.addEventListener("change", updatePreview);
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const freq = document.getElementById("freq").value;
+      const interval = document.getElementById("interval").value;
+      const count = document.getElementById("count").value;
+      const dtstart = document.getElementById("dtstart").value;
+      const until = document.getElementById("until").value;
+      const lenStr = lenInput.value;
+      const len = parseDuration(lenStr);
+      const type = document.getElementById("type").value.toLowerCase();
+
+      const rruleStr = buildRRule(freq, interval, dtstart, until, count);
+
+      const payload = {
+        Rule: {
+          RRule: rruleStr,
+          Len: len
+        },
+        Type: type
+      };
+
+      output.textContent = JSON.stringify(payload, null, 2);
+
+      try {
+        const resp = await fetch("http://localhost:8080/rrules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        console.log("Response status:", resp.status);
+      } catch (err) {
+        console.error("Error sending request:", err);
+      }
+    });
+
+    updatePreview();
+    validateLength();
+  </script>
+
+</body>
+</html>

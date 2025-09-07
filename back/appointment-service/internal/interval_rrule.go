@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/teambition/rrule-go"
@@ -59,12 +60,44 @@ func (r *IntervalRRule) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type IntervalType int
+type IntervalType string
 
 const (
-	Inclusion IntervalType = iota
-	Exclusion
+	Inclusion IntervalType = "inclusion"
+	Exclusion IntervalType = "exclusion"
 )
+
+func (i IntervalType) isValid() bool {
+	switch i {
+	case Inclusion:
+		fallthrough
+	case Exclusion:
+		return true
+	}
+	return false
+}
+
+func (i IntervalType) MarshalJSON() ([]byte, error) {
+	if !i.isValid() {
+		return nil, fmt.Errorf("IntervalType: wrong value %v", i)
+	}
+	return json.Marshal(string(i))
+}
+
+func (i *IntervalType) UnmarshalJSON(in []byte) error {
+	var v string
+	err := json.Unmarshal(in, &v)
+	if err != nil {
+		return err
+	}
+
+	if !IntervalType(v).isValid() {
+		return fmt.Errorf("IntervalType: wrong value %v", v)
+	}
+
+	*i = IntervalType(v)
+	return nil
+}
 
 type IntervalRRuleWithType struct {
 	Rule IntervalRRule
