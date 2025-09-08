@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	common "scheduler/appointment-service/internal"
@@ -20,7 +21,7 @@ type Route struct {
 	Name        string
 	Method      string
 	Pattern     string
-	HandlerFunc http.HandlerFunc
+	HandlerFunc http.Handler
 }
 
 type Routes []Route
@@ -81,12 +82,12 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 
 	//TODO add/remove business rules
 	var routes = Routes{
-		Route{
-			"Index",
-			"GET",
-			"/",
-			CheckAuthHandler(sesStore, userCheck, http.HandlerFunc(Index), http.HandlerFunc(LoginRequired)),
-		},
+		// Route{
+		// 	"Index",
+		// 	"GET",
+		// 	"/",
+		// 	CheckAuthHandler(sesStore, userCheck, http.HandlerFunc(Index), http.HandlerFunc(LoginRequired)),
+		// },
 		Route{
 			"SlotsBusinessIdGet",
 			"GET",
@@ -161,6 +162,10 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			Name(route.Name).
 			Handler(handler)
 	}
+
+	//TODO Fix paths
+	router.Methods("GET").PathPrefix("/front/").Name("FileServer").
+		Handler(http.StripPrefix("/front/", http.FileServer(http.Dir(os.Getenv("FRONT_PATH")))))
 
 	return router
 }

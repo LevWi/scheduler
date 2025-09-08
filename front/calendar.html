@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Календарь слотов — с подсветкой дат со слотами</title>
+
+  <!-- React (dev) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <style>
+    :root { --sidebar-w:320px; --hour-h:40px; --px-per-hour:40; }
+    html,body{height:100%;margin:0;font-family:Inter,Arial,sans-serif;background:#fff}
+    #root{height:100%;display:flex}
+
+    /* Sidebar */
+    .sidebar{width:var(--sidebar-w);border-right:1px solid #e6e6e6;padding:14px;box-sizing:border-box;background:#fafafa}
+    .month-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+    .month-nav button{padding:6px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .month-title{font-weight:600;font-size:16px}
+    .wkrow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+    .wkday{text-align:center;font-size:12px;color:#666}
+    .mini-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .day-cell{display:flex;align-items:center;justify-content:center;height:36px;border-radius:6px;cursor:pointer;user-select:none}
+    .day-cell:hover{background:#eef6ff}
+    .day-cell.inactive{color:#bdbdbd;cursor:default;background:transparent}
+    .day-cell.today{box-shadow: inset 0 0 0 2px rgba(66,133,244,0.06)}
+    .day-cell.selected { outline: 2px solid #2b6cb0; }
+    /* highlight that there is at least one slot on that date */
+    .day-cell.has-slot { background: linear-gradient(180deg,#e6ffed, #d4f7db); font-weight:600; color:#114b22; }
+
+    .legend{margin-top:12px;font-size:13px;color:#444}
+
+    /* Main week view */
+    .main{flex:1;padding:12px;overflow:auto}
+    .week-header{display:grid;grid-template-columns:60px repeat(7,1fr);align-items:center;margin-bottom:6px}
+    .day-header{padding:6px;text-align:center;font-weight:600;font-size:13px;border-bottom:1px solid #eee;background:#fff}
+    .week-body{display:grid;grid-template-columns:60px repeat(7,1fr);gap:0;align-items:start}
+    .time-col{display:flex;flex-direction:column;align-items:flex-end;padding-right:8px;box-sizing:border-box}
+    .time-cell{height:var(--hour-h);font-size:12px;color:#666;line-height:var(--hour-h);padding-right:6px}
+    .day-column{position:relative;border-left:1px solid #f0f0f0;min-height:calc(var(--hour-h) * 24);box-sizing:border-box;background:#fff}
+    .hour-line{height:var(--hour-h);border-bottom:1px dashed #f5f5f5;box-sizing:border-box}
+    .slot{position:absolute;left:6px;right:6px;background:linear-gradient(180deg,#4caf50,#3b9b3b);color:#fff;padding:6px 8px;font-size:12px;border-radius:6px;box-shadow:0 2px 6px rgba(27,90,36,0.12);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .status { font-size:13px; color:#666; margin-top:8px; }
+
+    @media (max-width:900px){ .sidebar{display:none} }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+<script type="text/babel">
+/* ---------------- constants & helpers ---------------- */
+const PIXELS_PER_HOUR = 40;
+
+// parse cur_date param (YYYY-MM-DD) into a LOCAL Date at 00:00 local
+function parseLocalDateYMD(s) {
+  if (!s) return null;
+  const parts = s.split('-');
+  if (parts.length !== 3) return null;
+  const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+  return new Date(y, m, d, 0,0,0,0);
+}
+function localDateKey(d) { // returns YYYY-MM-DD for local date
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// UTC month boundary helpers (for request)
+function monthStartUtcMs(year, monthIndex) {
+  // 00:00:00Z of first day
+  return Date.UTC(year, monthIndex, 1, 0,0,0);
+}
+function monthEndUtcMs(year, monthIndex) {
+  // 23:59:59Z of last day
+  return Date.UTC(year, monthIndex+1, 0, 23,59,59);
+}
+
+// Monday (local) for a given local date
+function getMondayLocal(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dow = d.getDay(); // 0..6
+  const delta = (dow === 0) ? -6 : (1 - dow);
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta);
+  monday.setHours(0,0,0,0);
+  return monday;
+}
+
+function addMonthsLocal(d, n) {
+  return new Date(d.getFullYear(), d.getMonth()+n, 1);
+}
+
+function daysInMonthLocal(year, monthIndex) {
+  return new Date(year, monthIndex+1, 0).getDate();
+}
+
+// generate month grid Monday-first (array of {date:Date, inMonth:bool})
+function monthGrid(localMonthDate) {
+  const year = localMonthDate.getFullYear();
+  const month = localMonthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const firstDow = firstDay.getDay(); // 0..6
+  const lead = (firstDow === 0) ? 6 : firstDow - 1;
+  const daysCount = daysInMonthLocal(year, month);
+  const grid = [];
+  // prev-month tail
+  const prevMonthLast = new Date(year, month, 0).getDate();
+  for (let i=0;i<lead;i++){
+    const d = new Date(year, month-1, prevMonthLast - (lead - 1) + i);
+    grid.push({date:d, inMonth:false});
+  }
+  for (let dd=1; dd<=daysCount; dd++) grid.push({date:new Date(year, month, dd), inMonth:true});
+  while (grid.length % 7 !== 0) {
+    const nextDay = grid.length - lead - daysCount + 1;
+    const d = new Date(year, month+1, nextDay);
+    grid.push({date:d, inMonth:false});
+  }
+  return grid;
+}
+
+/* ---------------- App component ---------------- */
+function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const bid = urlParams.get('bid');
+  const curDateParam = urlParams.get('cur_date');
+  const initialDate = curDateParam ? (parseLocalDateYMD(curDateParam) || new Date()) : new Date();
+
+  const [activeMonthLocal, setActiveMonthLocal] = React.useState(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+  const [weekStartLocal, setWeekStartLocal] = React.useState(getMondayLocal(initialDate));
+  const [slots, setSlots] = React.useState([]); // raw slots from server
+  const [hasSlotDates, setHasSlotDates] = React.useState(new Set()); // Set of local YYYY-MM-DD strings
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  // build month grid for mini calendar
+  const grid = React.useMemo(() => monthGrid(activeMonthLocal), [activeMonthLocal]);
+
+  // fetch slots when activeMonthLocal or bid changes
+  React.useEffect(() => {
+    if (!bid) return;
+    fetchSlotsForActiveMonth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMonthLocal, bid]);
+
+  function fetchSlotsForActiveMonth() {
+    setLoading(true); setError(null);
+    const y = activeMonthLocal.getFullYear();
+    const m = activeMonthLocal.getMonth();
+    const startMs = monthStartUtcMs(y,m) - 7 * 24 * 3600 * 1000; // minus 7 days
+    const endMs   = monthEndUtcMs(y,m)   + 7 * 24 * 3600 * 1000; // plus 7 days
+    const date_start = new Date(startMs).toISOString();
+    const date_end = new Date(endMs).toISOString();
+
+    const url = `/slots/${bid}/?date_start=${encodeURIComponent(date_start)}&date_end=${encodeURIComponent(date_end)}`;
+    fetch(url)
+      .then(async res => {
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>"");
+          throw new Error(`${res.status} ${txt}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        const arr = Array.isArray(data.slots) ? data.slots : [];
+        setSlots(arr);
+
+        // compute set of local date keys that have at least one overlapping slot
+        const set = new Set();
+        arr.forEach(s => {
+          const startUtc = new Date(s.tp_start); // instant
+          const endUtc   = new Date(startUtc.getTime() + s.len * 60 * 1000); // len in minutes -> ms
+
+          // compute local date for start and end
+          // iterate day by day in LOCAL timezone between startLocal.date and endLocal.date
+          const startLocal = new Date(startUtc.getFullYear(), startUtc.getMonth(), startUtc.getDate(), startUtc.getHours(), startUtc.getMinutes(), startUtc.getSeconds());
+          // BUT simpler: we want local midnight for start and end:
+          const firstLocal = new Date(startUtc.getFullYear(), startUtc.getMonth(), startUtc.getDate(), 0,0,0,0);
+          const lastLocalDt = new Date(endUtc.getFullYear(), endUtc.getMonth(), endUtc.getDate(), 0,0,0,0);
+          // iterate from firstLocal to lastLocalDt inclusive
+          for (let d = new Date(firstLocal); d <= lastLocalDt; d.setDate(d.getDate()+1)) {
+            // To be precise: check if slot actually overlaps this local day
+            const dayStartMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0).getTime();
+            const dayEndMs = dayStartMs + 24*3600*1000;
+            const slotStartMs = startUtc.getTime();
+            const slotEndMs = endUtc.getTime();
+            if (!(slotEndMs <= dayStartMs || slotStartMs >= dayEndMs)) {
+              set.add(localDateKey(d));
+            }
+          }
+        });
+        setHasSlotDates(set);
+      })
+      .catch(err => {
+        console.error(err);
+        setError(String(err));
+        setSlots([]);
+        setHasSlotDates(new Set());
+      })
+      .finally(() => setLoading(false));
+  }
+
+  // update cur_date in URL (YYYY-MM-DD local)
+  function updateCurDateParam(dateLocal) {
+    const p = new URLSearchParams(window.location.search);
+    p.set('cur_date', localDateKey(dateLocal));
+    // preserve bid if present (we don't remove other params)
+    const newUrl = window.location.pathname + '?' + p.toString();
+    window.history.replaceState({}, '', newUrl);
+  }
+
+  // click a day in mini-calendar
+  function onClickDayCell(dayDate) {
+    if (!(dayDate instanceof Date)) return;
+    setActiveMonthLocal(new Date(dayDate.getFullYear(), dayDate.getMonth(), 1));
+    setWeekStartLocal(getMondayLocal(dayDate));
+    updateCurDateParam(dayDate);
+  }
+
+  // month navigation
+  function prevMonth() {
+    setActiveMonthLocal(addMonthsLocal(activeMonthLocal, -1));
+  }
+  function nextMonth() {
+    setActiveMonthLocal(addMonthsLocal(activeMonthLocal, +1));
+  }
+
+  // weekDays (local Dates at 00:00 local)
+  const weekDays = React.useMemo(() => {
+    const arr=[];
+    for (let i=0;i<7;i++){
+      const d = new Date(weekStartLocal.getFullYear(), weekStartLocal.getMonth(), weekStartLocal.getDate()+i, 0,0,0,0);
+      arr.push(d);
+    }
+    return arr;
+  }, [weekStartLocal]);
+
+  // render slots overlapping given local day
+  function renderSlotsForDay(dayLocalDate) {
+    const dayStartLocalMs = new Date(dayLocalDate.getFullYear(), dayLocalDate.getMonth(), dayLocalDate.getDate(), 0,0,0,0).getTime();
+    const dayEndLocalMs = dayStartLocalMs + 24*3600*1000;
+    const items = [];
+    slots.forEach((s, idx) => {
+      const startUtc = new Date(s.tp_start); // instant
+      const endUtc = new Date(startUtc.getTime() + s.len * 60 * 1000);
+      const slotStartMs = startUtc.getTime();
+      const slotEndMs = endUtc.getTime();
+
+      // overlap with local day
+      const overlapStartMs = Math.max(slotStartMs, dayStartLocalMs);
+      const overlapEndMs = Math.min(slotEndMs, dayEndLocalMs);
+      const overlapMs = overlapEndMs - overlapStartMs;
+      if (overlapMs <= 0) return;
+
+      // minutes from local day start (top), and height in px
+      const minutesFromDayStart = (overlapStartMs - dayStartLocalMs) / 60000;
+      const overlapMinutes = overlapMs / 60000;
+      const topPx = (minutesFromDayStart / 60) * PIXELS_PER_HOUR;
+      const heightPx = (overlapMinutes / 60) * PIXELS_PER_HOUR;
+
+      const pStart = new Date(overlapStartMs);
+      const pEnd = new Date(overlapEndMs);
+      const label = `${pStart.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}–${pEnd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+
+      items.push(
+        <div key={idx + "-" + dayLocalDate.toISOString()} className="slot"
+             title={label}
+             style={{ top: topPx + 'px', height: Math.max(18, heightPx) + 'px' }}>
+          {label}
+        </div>
+      );
+    });
+    return items;
+  }
+
+  // if no bid -> show message
+  if (!bid) {
+    return <div style={{padding:20, color:'red'}}>Ошибка: параметр <b>bid</b> отсутствует в URL. Откройте /front/calendar.html?bid=...</div>;
+  }
+
+  const today = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+
+  return (
+    <div style={{display:'flex', height:'100%'}}>
+      <div className="sidebar">
+        <div className="month-nav">
+          <button onClick={prevMonth} aria-label="Previous month">‹</button>
+          <div className="month-title">{activeMonthLocal.toLocaleDateString([], { month:'long', year:'numeric' })}</div>
+          <button onClick={nextMonth} aria-label="Next month">›</button>
+        </div>
+
+        <div className="wkrow">
+          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((w,i) => <div key={i} className="wkday">{w}</div>)}
+        </div>
+
+        <div className="mini-calendar" role="grid" aria-label="mini calendar">
+          {grid.map((it, idx) => {
+            const inMonth = it.inMonth;
+            const isToday = it.date.getFullYear()===today.getFullYear() && it.date.getMonth()===today.getMonth() && it.date.getDate()===today.getDate();
+            const key = localDateKey(it.date);
+            const classes = ['day-cell'];
+            if (!inMonth) classes.push('inactive'); else classes.push('selected-month');
+            if (isToday) classes.push('today');
+            if (localDateKey(it.date) === localDateKey(weekStartLocal) || (it.date.getTime() >= weekStartLocal.getTime() && it.date.getTime() < (weekStartLocal.getTime() + 7*86400000))) {
+              // optional: indicate days of current displayed week with subtle outline
+              // (we won't add class but could)
+            }
+            if (hasSlotDates.has(key)) classes.push('has-slot');
+            // highlight exact clicked current date (cur_date) — compare with weekStartLocal? We'll mark if same day as weekStartLocal? 
+            // Instead mark if equals the cur_date param date:
+            // But we track selected day implicitly: mark if same YMD as weekStartLocal + offset 0..6? We'll not change selected styling here.
+            return (
+              <div key={idx}
+                   className={classes.join(' ')}
+                   onClick={() => onClickDayCell(it.date)}
+                   aria-disabled={!inMonth}>
+                {it.date.getDate()}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="legend">Активный месяц: <b>{activeMonthLocal.toLocaleDateString()}</b></div>
+        <div className="status">{loading ? 'Загружаем…' : (error ? 'Ошибка: ' + error : `Слотов: ${slots.length}`)}</div>
+      </div>
+
+      <div className="main">
+        <div style={{marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div style={{fontWeight:600}}>Week starting {weekStartLocal.toLocaleDateString()}</div>
+        </div>
+
+        <div className="week-header">
+          <div style={{height:32}}></div>
+          {weekDays.map((d,i) => <div key={i} className="day-header">{d.toLocaleDateString(undefined, { weekday:'short', day:'2-digit', month:'2-digit' })}</div>)}
+        </div>
+
+        <div className="week-body">
+          <div className="time-col">
+            {Array.from({length:24}).map((_,h) => <div key={h} className="time-cell">{String(h).padStart(2,'0')}:00</div>)}
+          </div>
+
+          {weekDays.map((d, idx) => (
+            <div key={idx} className="day-column" style={{height: (PIXELS_PER_HOUR * 24) + 'px'}}>
+              <div style={{display:'flex', flexDirection:'column'}}>
+                {Array.from({length:24}).map((_,hh) => <div key={hh} className="hour-line" style={{height:PIXELS_PER_HOUR + 'px'}}></div>)}
+              </div>
+              {renderSlotsForDay(d)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* render */
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

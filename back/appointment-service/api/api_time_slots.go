@@ -92,6 +92,7 @@ func SlotsBusinessIdGet(s *storage.Storage, w http.ResponseWriter, r *http.Reque
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	//TODO http: superfluous response.WriteHeader call
 	w.WriteHeader(http.StatusOK)
 }
 

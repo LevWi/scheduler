@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>RRules Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      display: flex;
+      gap: 40px;
+    }
+    .form-block, .list-block {
+      flex: 1;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    input, select, button {
+      padding: 8px;
+      font-size: 14px;
+    }
+    input.invalid {
+      border: 2px solid red;
+      background: #ffe3e3;
+    }
+    .create-btn {
+      background: #2f9e44;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .delete-btn {
+      margin-top: 15px;
+      background: #e03131;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 8px 16px;
+    }
+    .delete-btn:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      padding: 10px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    li.selected {
+      background: #d0ebff;
+      border-color: #339af0;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-block">
+    <h2>Создать правило</h2>
+    <form id="createForm">
+      <input type="text" id="rrule" placeholder="RRULE (например: FREQ=DAILY;INTERVAL=1)" required />
+      <input type="text" id="len" placeholder="Len (например: 1d2h30min)" required />
+      <select id="type">
+        <option value="inclusion">inclusion</option>
+        <option value="exclusion">exclusion</option>
+      </select>
+      <button type="submit" class="create-btn">Создать</button>
+    </form>
+  </div>
+
+  <div class="list-block">
+    <h2>Список правил</h2>
+    <ul id="rules"></ul>
+    <button id="deleteBtn" class="delete-btn" disabled>Удалить</button>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8080";
+    let selectedId = null;
+
+    const rulesList = document.getElementById("rules");
+    const deleteBtn = document.getElementById("deleteBtn");
+    const form = document.getElementById("createForm");
+    const lenInput = document.getElementById("len");
+
+    // --- Функция для преобразования строки в секунды ---
+    function parseDuration(str) {
+      const regex = /(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)min)?(?:(\d+)sec)?$/;
+      const match = str.match(regex);
+      if (!match) return null;
+      const days = parseInt(match[1] || "0", 10);
+      const hours = parseInt(match[2] || "0", 10);
+      const mins = parseInt(match[3] || "0", 10);
+      const secs = parseInt(match[4] || "0", 10);
+      return days*86400 + hours*3600 + mins*60 + secs;
+    }
+
+    // --- Валидация поля Len ---
+    lenInput.addEventListener("input", () => {
+      const seconds = parseDuration(lenInput.value.trim());
+      if (seconds === null || seconds === 0) {
+        lenInput.classList.add("invalid");
+      } else {
+        lenInput.classList.remove("invalid");
+      }
+    });
+
+    // --- Загрузка правил ---
+    async function loadRules() {
+      rulesList.innerHTML = "<li>Загружаем...</li>";
+      try {
+        const resp = await fetch(`${API_BASE}/rrules`);
+        const rulesData = await resp.json();
+        rulesList.innerHTML = "";
+        rulesData.forEach(rule => {
+          const li = document.createElement("li");
+          li.textContent = `${rule.Rrule.Type.toUpperCase()} → ${rule.Rrule.Rule.RRule} (len=${rule.Rrule.Rule.Len})`;
+          li.addEventListener("click", () => selectRule(rule.Id, li));
+          rulesList.appendChild(li);
+        });
+      } catch (e) {
+        rulesList.innerHTML = "<li style='color:red'>Ошибка загрузки правил</li>";
+      }
+    }
+
+    function selectRule(id, element) {
+      selectedId = id;
+      document.querySelectorAll("li").forEach(li => li.classList.remove("selected"));
+      element.classList.add("selected");
+      deleteBtn.disabled = false;
+    }
+
+    // --- Удаление правила ---
+    deleteBtn.addEventListener("click", async () => {
+      if (!selectedId) return;
+      const resp = await fetch(`${API_BASE}/rrules/${selectedId}`, { method: "DELETE" });
+      if (resp.ok) {
+        selectedId = null;
+        deleteBtn.disabled = true;
+        await loadRules();
+      } else {
+        alert("Ошибка при удалении");
+      }
+    });
+
+    // --- Создание нового правила ---
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rrule = document.getElementById("rrule").value.trim();
+      const lenStr = lenInput.value.trim();
+      const type = document.getElementById("type").value;
+
+      const lenSec = parseDuration(lenStr);
+      if (!lenSec) {
+        lenInput.classList.add("invalid");
+        alert("Неверный формат длительности");
+        return;
+      }
+
+      const body = {
+        Rule: { RRule: rrule, Len: lenSec },
+        Type: type
+      };
+
+      const resp = await fetch(`${API_BASE}/rrules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (resp.ok) {
+        form.reset();
+        lenInput.classList.remove("invalid");
+        await loadRules();
+      } else {
+        alert("Ошибка при создании правила");
+      }
+    });
+
+    // первая загрузка
+    loadRules();
+  </script>
+</body>
+</html>
