@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Календарь слотов</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Левая часть - календарь */
+        .calendar-section {
+            flex: 0 0 300px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header h3 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .nav-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .nav-btn:hover {
+            background: #45a049;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-weight: bold;
+            padding: 8px;
+            background: #f0f0f0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .calendar-day {
+            text-align: center;
+            padding: 10px 5px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .calendar-day:hover {
+            background: #e8f5e8;
+        }
+
+        .calendar-day.other-month {
+            color: #ccc;
+        }
+
+        .calendar-day.has-slots {
+            background: #e8f5e8;
+            color: #2e7d32;
+            font-weight: bold;
+        }
+
+        .calendar-day.selected {
+            background: #4CAF50;
+            color: white;
+        }
+
+        /* Правая часть - недельный вид */
+        .week-section {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .week-header {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 20px;
+            color: #333;
+        }
+
+        .week-view {
+            display: flex;
+            height: calc(100vh - 140px);
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .time-column {
+            flex: 0 0 80px;
+            background: #f8f8f8;
+            border-right: 1px solid #ddd;
+        }
+
+        .time-slot {
+            height: 60px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .days-container {
+            flex: 1;
+            display: flex;
+        }
+
+        .day-column {
+            flex: 1;
+            border-right: 1px solid #ddd;
+            position: relative;
+        }
+
+        .day-column:last-child {
+            border-right: none;
+        }
+
+        .day-header {
+            height: 40px;
+            background: #f8f8f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #ddd;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .day-date {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .day-content {
+            height: calc(100% - 40px);
+            position: relative;
+        }
+
+        .hour-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 60px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .slot {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            background: #4CAF50;
+            border-radius: 3px;
+            opacity: 0.8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        .slot:hover {
+            opacity: 1;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #d32f2f;
+            background: #ffebee;
+            border-radius: 5px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Левый календарь -->
+        <div class="calendar-section">
+            <div class="calendar-header">
+                <button class="nav-btn" onclick="changeMonth(-1)">&lt;</button>
+                <h3 id="calendar-month">Январь 2025</h3>
+                <button class="nav-btn" onclick="changeMonth(1)">&gt;</button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid">
+                <div class="calendar-day-header">Пн</div>
+                <div class="calendar-day-header">Вт</div>
+                <div class="calendar-day-header">Ср</div>
+                <div class="calendar-day-header">Чт</div>
+                <div class="calendar-day-header">Пт</div>
+                <div class="calendar-day-header">Сб</div>
+                <div class="calendar-day-header">Вс</div>
+            </div>
+        </div>
+
+        <!-- Правый недельный вид -->
+        <div class="week-section">
+            <div class="week-header" id="week-header">Неделя</div>
+            <div id="week-content">
+                <div class="loading">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Глобальные перемены
+        let businessId = null;
+        let currentMonth = new Date();
+        let selectedDate = new Date();
+        let slotsData = [];
+        
+        // Дни недели
+        const weekDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+        const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                           'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Получение business_id из URL
+            const urlParams = new URLSearchParams(window.location.search);
+            businessId = urlParams.get('bid');
+            
+            if (!businessId) {
+                showError('Не указан ID бизнеса в URL (параметр bid)');
+                return;
+            }
+
+            // Установка текущего месяца и даты
+            currentMonth = new Date();
+            selectedDate = new Date();
+            
+            // Обновление календаря и загрузка данных
+            updateCalendar();
+            loadSlots();
+        });
+
+        // Получение параметра из URL
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Изменение месяца
+        function changeMonth(direction) {
+            currentMonth.setMonth(currentMonth.getMonth() + direction);
+            updateCalendar();
+            loadSlots();
+        }
+
+        // Обновление календаря
+        function updateCalendar() {
+            const monthHeader = document.getElementById('calendar-month');
+            monthHeader.textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+            
+            const grid = document.getElementById('calendar-grid');
+            // Удаляем все дни, оставляем только заголовки
+            const dayHeaders = grid.querySelectorAll('.calendar-day-header');
+            grid.innerHTML = '';
+            dayHeaders.forEach(header => grid.appendChild(header));
+            
+            // Первый день месяца
+            const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            // Последний день месяца
+            const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+            
+            // Начинаем с понедельника (1 = понедельник, 0 = воскресенье)
+            let startDate = new Date(firstDay);
+            const dayOfWeek = (firstDay.getDay() + 6) % 7; // Конвертируем в понедельник = 0
+            startDate.setDate(firstDay.getDate() - dayOfWeek);
+            
+            // Генерируем дни календаря
+            for (let i = 0; i < 42; i++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                dayElement.textContent = startDate.getDate();
+                
+                const isCurrentMonth = startDate.getMonth() === currentMonth.getMonth();
+                const isSelected = isSameDate(startDate, selectedDate);
+                
+                if (!isCurrentMonth) {
+                    dayElement.classList.add('other-month');
+                }
+                
+                if (isSelected) {
+                    dayElement.classList.add('selected');
+                }
+                
+                const dayDate = new Date(startDate);
+                dayElement.onclick = () => selectDate(dayDate);
+                
+                grid.appendChild(dayElement);
+                startDate.setDate(startDate.getDate() + 1);
+            }
+        }
+
+        // Выбор даты
+        function selectDate(date) {
+            selectedDate = new Date(date);
+            updateCalendar();
+            updateWeekView();
+        }
+
+        // Проверка на одинаковую дату
+        function isSameDate(date1, date2) {
+            return date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate();
+        }
+
+        // Получение начала недели (понедельник)
+        function getWeekStart(date) {
+            const result = new Date(date);
+            const dayOfWeek = (result.getDay() + 6) % 7; // Понедельник = 0
+            result.setDate(result.getDate() - dayOfWeek);
+            result.setHours(0, 0, 0, 0);
+            return result;
+        }
+
+        // Получение даты для запроса (начало месяца минус неделя)
+        function getQueryDateStart() {
+            const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            const result = new Date(firstDay);
+            result.setDate(result.getDate() - 7);
+            return result.toISOString();
+        }
+
+        // Получение даты для запроса (конец месяца плюс неделя)
+        function getQueryDateEnd() {
+            const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+            const result = new Date(lastDay);
+            result.setDate(result.getDate() + 7);
+            result.setHours(23, 59, 59, 999);
+            return result.toISOString();
+        }
+
+        // Загрузка слотов
+        async function loadSlots() {
+            try {
+                const dateStart = getQueryDateStart();
+                const dateEnd = getQueryDateEnd();
+                
+                const url = `/slots/${businessId}/?date_start=${encodeURIComponent(dateStart)}&date_end=${encodeURIComponent(dateEnd)}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                slotsData = data.slots || [];
+                
+                updateCalendarWithSlots();
+                updateWeekView();
+                
+            } catch (error) {
+                console.error('Ошибка загрузки слотов:', error);
+                showError(`Ошибка загрузки слотов: ${error.message}`);
+            }
+        }
+
+        // Обновление календаря с подсветкой дней со слотами
+        function updateCalendarWithSlots() {
+            const dayElements = document.querySelectorAll('.calendar-day');
+            const slotsPerDay = new Map();
+            
+            // Группировка слотов по дням
+            slotsData.forEach(slot => {
+                const slotDate = new Date(slot.tp_start);
+                const dayKey = `${slotDate.getFullYear()}-${slotDate.getMonth()}-${slotDate.getDate()}`;
+                
+                if (!slotsPerDay.has(dayKey)) {
+                    slotsPerDay.set(dayKey, []);
+                }
+                slotsPerDay.get(dayKey).push(slot);
+            });
+            
+            // Обновление стилей дней
+            dayElements.forEach((dayElement, index) => {
+                const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+                const dayOfWeek = (firstDay.getDay() + 6) % 7;
+                const startDate = new Date(firstDay);
+                startDate.setDate(firstDay.getDate() - dayOfWeek + index);
+                
+                const dayKey = `${startDate.getFullYear()}-${startDate.getMonth()}-${startDate.getDate()}`;
+                
+                if (slotsPerDay.has(dayKey)) {
+                    dayElement.classList.add('has-slots');
+                } else {
+                    dayElement.classList.remove('has-slots');
+                }
+            });
+        }
+
+        // Обновление недельного вида
+        function updateWeekView() {
+            const weekStart = getWeekStart(selectedDate);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            
+            // Обновление заголовка недели
+            const weekHeader = document.getElementById('week-header');
+            weekHeader.textContent = `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
+            
+            // Создание недельного вида
+            createWeekView(weekStart);
+        }
+
+        // Создание недельного вида
+        function createWeekView(weekStart) {
+            const weekContent = document.getElementById('week-content');
+            
+            const weekView = document.createElement('div');
+            weekView.className = 'week-view';
+            
+            // Колонка времени
+            const timeColumn = document.createElement('div');
+            timeColumn.className = 'time-column';
+            
+            for (let hour = 0; hour < 24; hour++) {
+                const timeSlot = document.createElement('div');
+                timeSlot.className = 'time-slot';
+                timeSlot.textContent = `${hour.toString().padStart(2, '0')}:00`;
+                timeColumn.appendChild(timeSlot);
+            }
+            
+            weekView.appendChild(timeColumn);
+            
+            // Контейнер для дней
+            const daysContainer = document.createElement('div');
+            daysContainer.className = 'days-container';
+            
+            // Создание колонок для каждого дня недели
+            for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+                const currentDay = new Date(weekStart);
+                currentDay.setDate(weekStart.getDate() + dayOffset);
+                
+                const dayColumn = document.createElement('div');
+                dayColumn.className = 'day-column';
+                
+                // Заголовок дня
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                dayHeader.innerHTML = `
+                    <div>${weekDays[dayOffset].substring(0, 3)}</div>
+                    <div class="day-date">${currentDay.getDate()}</div>
+                `;
+                dayColumn.appendChild(dayHeader);
+                
+                // Контент дня
+                const dayContent = document.createElement('div');
+                dayContent.className = 'day-content';
+                
+                // Линии часов
+                for (let hour = 0; hour < 24; hour++) {
+                    const hourLine = document.createElement('div');
+                    hourLine.className = 'hour-line';
+                    hourLine.style.top = `${hour * 60}px`;
+                    dayContent.appendChild(hourLine);
+                }
+                
+                // Добавление слотов для этого дня
+                addSlotsForDay(dayContent, currentDay);
+                
+                dayColumn.appendChild(dayContent);
+                daysContainer.appendChild(dayColumn);
+            }
+            
+            weekView.appendChild(daysContainer);
+            
+            weekContent.innerHTML = '';
+            weekContent.appendChild(weekView);
+        }
+
+        // Добавление слотов для конкретного дня
+        function addSlotsForDay(dayContent, date) {
+            slotsData.forEach(slot => {
+                const slotStart = new Date(slot.tp_start);
+                
+                // Проверяем, относится ли слот к этому дню
+                if (isSameDate(slotStart, date)) {
+                    const slotElement = createSlotElement(slot);
+                    dayContent.appendChild(slotElement);
+                }
+            });
+        }
+
+        // Создание элемента слота
+        function createSlotElement(slot) {
+            const slotStart = new Date(slot.tp_start);
+            const slotEnd = new Date(slotStart.getTime() + slot.len * 60000); // len в минутах
+            
+            // Конвертация в локальное время
+            const localStart = new Date(slotStart.getTime() - slotStart.getTimezoneOffset() * 60000);
+            const localEnd = new Date(slotEnd.getTime() - slotEnd.getTimezoneOffset() * 60000);
+            
+            const startHour = slotStart.getHours();
+            const startMinute = slotStart.getMinutes();
+            const durationMinutes = slot.len;
+            
+            const slotElement = document.createElement('div');
+            slotElement.className = 'slot';
+            
+            // Позиционирование слота
+            const topPosition = startHour * 60 + startMinute;
+            slotElement.style.top = `${topPosition}px`;
+            slotElement.style.height = `${durationMinutes}px`;
+            
+            // Текст слота
+            const startTime = formatTime(slotStart);
+            const endTime = formatTime(slotEnd);
+            slotElement.textContent = `${startTime} - ${endTime}`;
+            
+            // Обработчик клика
+            slotElement.onclick = () => {
+                alert(`Слот выбран:\n${startTime} - ${endTime}\nДата: ${formatDate(slotStart)}`);
+            };
+            
+            return slotElement;
+        }
+
+        // Форматирование даты
+        function formatDate(date) {
+            const day = date.getDate().toString().padStart(2, '0');
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
+        }
+
+        // Форматирование времени
+        function formatTime(date) {
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        // Показ ошибки
+        function showError(message) {
+            const weekContent = document.getElementById('week-content');
+            weekContent.innerHTML = `<div class="error">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

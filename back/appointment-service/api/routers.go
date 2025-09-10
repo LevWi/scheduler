@@ -98,7 +98,7 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots/{business_id}",
-			SlotsBusinessIdPostFunc(storage),
+			SlotsBusinessIdPostFunc(storage, storage),
 		},
 		Route{
 			"AddBusinessRulePost",
