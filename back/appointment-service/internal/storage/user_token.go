@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"database/sql"
 	"errors"
 	"time"
 
@@ -30,87 +29,79 @@ const queryCreateUserTokensTable = `CREATE TABLE IF NOT EXISTS "user_tokens" (
 
 func CreateTableUserTokens(db *Storage) error {
 	_, err := db.Exec(queryCreateUserTokensTable)
-	return err
+	return adjustDbError(err)
 }
 
-// TODO fix
 func (db *Storage) AddUserToken(userID common.ID, token string, expiresAt time.Time) error {
-	// First try to update existing token for the user
-	result, err := db.Exec(`
-		UPDATE user_tokens 
-		SET token = $1, expires_at = $2, is_used = FALSE 
-		WHERE user_id = $3
-	`, token, expiresAt.Unix(), string(userID))
-
-	if err != nil {
-		return err
-	}
-
-	// Check if any rows were affected
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	// If no rows were updated, insert a new record
-	if rowsAffected == 0 {
-		_, err = db.Exec(`
-			INSERT INTO user_tokens (token, user_id, expires_at, is_used)
+	_, err := db.Exec(
+		`INSERT INTO user_tokens (user_id, token, expires_at, is_used)
 			VALUES ($1, $2, $3, FALSE)
-		`, token, string(userID), expiresAt.Unix())
-		return err
-	}
+		ON CONFLICT(user_id) DO UPDATE SET
+			token = $2,
+			expires_at = $3,
+			is_used = FALSE`, string(userID), token, expiresAt.Unix())
 
-	return nil
+	return adjustDbError(err)
 }
 
-// TODO fix it. Begin / Commit
 func (db *Storage) ExchangeToken(token string) (common.ID, error) {
-	var dbToken dbUserToken
-
-	// Get token from database
-	err := db.Get(&dbToken, `
-		SELECT token, user_id, expires_at, is_used 
-		FROM user_tokens 
-		WHERE token = $1
-	`, token)
-
+	tx, err := db.Beginx()
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", common.ErrNotFound
+		return "", adjustDbError(err)
+	}
+	defer tx.Rollback()
+
+	//Normally we would use Select -> check -> UPDATE
+	//But SQLite doesn't support SELECT FOR UPDATE
+	now := time.Now().Unix()
+	res, err := tx.Exec(
+		`UPDATE user_tokens
+		SET is_used = TRUE
+		WHERE token = $1
+		  AND is_used = FALSE
+		  AND expires_at > $2`,
+		token, now)
+	if err != nil {
+		return "", adjustDbError(err)
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		var dbToken dbUserToken
+		err = tx.Get(&dbToken,
+			`SELECT user_id, is_used, expires_at
+			FROM user_tokens
+			WHERE token = $1`, token)
+		if err != nil {
+			return "", adjustDbError(err)
 		}
-		return "", err
+
+		if dbToken.IsUsed {
+			return "", ErrTokenAlreadyUsed
+		}
+		if now > dbToken.ExpiresAt {
+			return "", ErrTokenExpired
+		}
+		return "", errors.New("token not found")
 	}
 
-	// Check if token is already used
-	if dbToken.IsUsed {
-		return "", ErrTokenAlreadyUsed
-	}
-
-	// Check if token is expired
-	if time.Now().Unix() > dbToken.ExpiresAt {
-		return "", ErrTokenExpired
-	}
-
-	// Mark token as used
-	_, err = db.Exec(`
-		UPDATE user_tokens 
-		SET is_used = TRUE 
-		WHERE token = $1
-	`, token)
-
+	var userID string
+	err = tx.Get(&userID,
+		`SELECT user_id FROM user_tokens WHERE token = $1`, token)
 	if err != nil {
-		return "", err
+		return "", adjustDbError(err)
 	}
 
-	return common.ID(dbToken.UserID), nil
+	if err = tx.Commit(); err != nil {
+		return "", adjustDbError(err)
+	}
+
+	return common.ID(userID), nil
 }
 
 // CleanupExpiredTokens removes expired tokens from the database
 func (db *Storage) CleanupExpiredTokens() error {
-	_, err := db.Exec(`
-		DELETE FROM user_tokens 
-		WHERE expires_at < $1
-	`, time.Now().Unix())
-	return err
+	_, err := db.Exec(`DELETE FROM user_tokens WHERE expires_at < $1`,
+		time.Now().Unix())
+	return adjustDbError(err)
 }

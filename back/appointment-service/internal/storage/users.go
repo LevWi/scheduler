@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
@@ -124,17 +123,6 @@ type User struct {
 	Username string
 	Id       UserID
 	PwdHash  string
-}
-
-// TODO add context?
-func adjustDbError(e error) error {
-	if e == nil {
-		return nil
-	}
-	if errors.Is(e, sql.ErrNoRows) {
-		e = common.ErrNotFound
-	}
-	return fmt.Errorf("db error: %w", e)
 }
 
 func (db *Storage) readUser(user string) (dbUser, error) {

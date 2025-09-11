@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	common "scheduler/appointment-service/internal"
@@ -53,15 +52,16 @@ func (db *Storage) OIDCCreateUser(userName string, in OIDCData) (UserID, error) 
 	if err != nil {
 		return "", adjustDbError(err)
 	}
+	defer tx.Rollback()
 
 	_, err = tx.Exec("INSERT INTO users (id, username) VALUES ($1, $2)", id, userName)
 	if err != nil {
-		goto Rollback
+		return "", adjustDbError(err)
 	}
 
 	_, err = tx.Exec("INSERT INTO user_oidc (user_id, provider, subject) VALUES ($1, $2, $3)", id, in.Provider, in.Subject)
 	if err != nil {
-		goto Rollback
+		return "", adjustDbError(err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -69,13 +69,6 @@ func (db *Storage) OIDCCreateUser(userName string, in OIDCData) (UserID, error) 
 	}
 
 	return UserID(id), nil
-
-Rollback:
-	re := tx.Rollback()
-	if re != nil {
-		err = errors.Join(err, tx.Rollback())
-	}
-	return "", adjustDbError(err)
 }
 
 func (db *Storage) OIDCPairWithUser(uid UserID, in OIDCData) error {

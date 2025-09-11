@@ -34,8 +34,7 @@ func TestUserToken(t *testing.T) {
 
 	// Try to exchange the same token again
 	_, err = storage.ExchangeToken("new-token")
-	assert.Error(t, err)
-	assert.Equal(t, ErrTokenAlreadyUsed, err)
+	assert.ErrorIs(t, err, ErrTokenAlreadyUsed)
 
 	// Try to exchange a non-existent token
 	_, err = storage.ExchangeToken("non-existent-token")
@@ -49,8 +48,7 @@ func TestUserToken(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = storage.ExchangeToken(expiredToken)
-	assert.Error(t, err)
-	assert.Equal(t, ErrTokenExpired, err)
+	assert.ErrorIs(t, err, ErrTokenExpired)
 
 	// Cleanup expired tokens
 	err = storage.CleanupExpiredTokens()
@@ -58,5 +56,5 @@ func TestUserToken(t *testing.T) {
 
 	// Try to get the expired token again
 	_, err = storage.ExchangeToken(expiredToken)
-	assert.Error(t, err, common.ErrNotFound)
+	assert.ErrorIs(t, err, common.ErrNotFound)
 }
