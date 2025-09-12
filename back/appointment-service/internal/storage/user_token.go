@@ -82,7 +82,8 @@ func (db *Storage) ExchangeToken(token string) (common.ID, error) {
 		if now > dbToken.ExpiresAt {
 			return "", ErrTokenExpired
 		}
-		return "", errors.New("token not found")
+
+		return "", errors.New("[ExchangeToken]: unexpected result")
 	}
 
 	var userID string
@@ -99,7 +100,6 @@ func (db *Storage) ExchangeToken(token string) (common.ID, error) {
 	return common.ID(userID), nil
 }
 
-// CleanupExpiredTokens removes expired tokens from the database
 func (db *Storage) CleanupExpiredTokens() error {
 	_, err := db.Exec(`DELETE FROM user_tokens WHERE expires_at < $1`,
 		time.Now().Unix())

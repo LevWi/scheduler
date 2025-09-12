@@ -38,7 +38,7 @@ func TestUserToken(t *testing.T) {
 
 	// Try to exchange a non-existent token
 	_, err = storage.ExchangeToken("non-existent-token")
-	assert.Error(t, err, common.ErrNotFound)
+	assert.ErrorIs(t, err, common.ErrNotFound)
 
 	// Test expired token
 	expiredToken := "expired-token"
