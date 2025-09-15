@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func newTestStorage(t *testing.T) *Storage {
@@ -23,12 +24,12 @@ func TestAddAndGetBot(t *testing.T) {
 	tokenHash := "hash_abc"
 	businessId := "biz_1"
 
-	// Добавляем бота
 	bot, err := st.AddBot(botId, tokenHash, businessId)
 	assert.NoError(t, err)
 
 	assert.Equal(t, botId, bot.BotId)
-	assert.Equal(t, tokenHash, bot.BotTokenHash)
+	err = bcrypt.CompareHashAndPassword([]byte(bot.BotTokenHash), []byte(tokenHash))
+	assert.NoError(t, err)
 	assert.Equal(t, businessId, bot.BusinessId)
 	assert.True(t, bot.IsActive)
 	assert.WithinDuration(t, time.Now(), bot.CreatedAt, time.Minute)
@@ -41,7 +42,8 @@ func TestAddAndGetBot(t *testing.T) {
 
 	got := bots[0]
 	assert.Equal(t, botId, got.BotId)
-	assert.Equal(t, tokenHash, got.BotTokenHash)
+	err = bcrypt.CompareHashAndPassword([]byte(bot.BotTokenHash), []byte(tokenHash))
+	assert.NoError(t, err)
 	assert.Equal(t, businessId, got.BusinessId)
 	assert.True(t, got.IsActive)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, time.Minute)
@@ -66,7 +68,8 @@ func TestEditBotStatus(t *testing.T) {
 
 	got := bots[0]
 	assert.Equal(t, botId, got.BotId)
-	assert.Equal(t, "hash_xyz", got.BotTokenHash)
+	err = bcrypt.CompareHashAndPassword([]byte(got.BotTokenHash), []byte("hash_xyz"))
+	assert.NoError(t, err)
 	assert.Equal(t, businessId, got.BusinessId)
 	assert.False(t, got.IsActive)
 	assert.WithinDuration(t, time.Now(), got.CreatedAt, time.Minute)
@@ -99,7 +102,6 @@ func TestBotIdUniqueness(t *testing.T) {
 	_, err := st.AddBot(botId, "hash1", businessId)
 	assert.NoError(t, err)
 
-	// Пытаемся добавить второго бота с тем же bot_id
 	_, err = st.AddBot(botId, "hash2", businessId)
 	assert.Error(t, err)
 }

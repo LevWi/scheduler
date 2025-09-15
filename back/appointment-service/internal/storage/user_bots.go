@@ -2,6 +2,8 @@ package storage
 
 import (
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const queryCreateUserBotsTable = `CREATE TABLE IF NOT EXISTS "user_bots" (
@@ -27,10 +29,15 @@ func CreateTableUserBots(db *Storage) error {
 	return adjustDbError(err)
 }
 
-func (s *Storage) AddBot(botId, botTokenHash, businessId string) (DbBot, error) {
+func (s *Storage) AddBot(botId, botToken, businessId string) (DbBot, error) {
+	botTokenHash, err := bcrypt.GenerateFromPassword([]byte(botToken), bcrypt.DefaultCost)
+	if err != nil {
+		return DbBot{}, err
+	}
+
 	query := `INSERT INTO "user_bots" ("bot_id", "bot_token_hash", "business_id") VALUES ($1, $2, $3) RETURNING *;`
 	var newBot DbBot
-	err := s.Get(&newBot, query, botId, botTokenHash, businessId)
+	err = s.Get(&newBot, query, botId, string(botTokenHash), businessId)
 	return newBot, adjustDbError(err)
 }
 

@@ -1,8 +1,6 @@
 package oidc
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	common "scheduler/appointment-service/internal"
@@ -17,12 +15,6 @@ type OAuth2SessionsValidator struct {
 	sessions.Store
 }
 
-func generateState() string {
-	var b [16]byte
-	rand.Read(b[:]) //Error not expected
-	return base64.URLEncoding.EncodeToString(b[:])
-}
-
 // TODO accept only one of request with same cookie ?
 // TODO session need to be short live
 func (v *OAuth2SessionsValidator) PrepareState(w http.ResponseWriter, r *http.Request) (string, error) {
@@ -31,7 +23,8 @@ func (v *OAuth2SessionsValidator) PrepareState(w http.ResponseWriter, r *http.Re
 		return "", fmt.Errorf("session creation fail: %w", err)
 	}
 
-	state := generateState()
+	const stateLength = 16
+	state := common.GenerateSecretKey(stateLength)
 	//TODO make session short lived?
 	session.Values[oauthStateKey] = state
 
