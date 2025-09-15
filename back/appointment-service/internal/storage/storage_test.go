@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strconv"
 	"testing"
@@ -16,10 +15,7 @@ import (
 )
 
 func initDB(t *testing.T) Storage {
-	dbPath := t.TempDir() + string(os.PathSeparator) + "test_.db"
-	t.Log("db path:", dbPath)
-
-	db, err := sqlx.Open("sqlite3", dbPath)
+	db, err := sqlx.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

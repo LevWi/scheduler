@@ -39,6 +39,7 @@ func main() {
 	storage.CreateUsersTable(strg)
 	storage.CreateBusinessTable(strg)
 	storage.CreateTableAppointments(strg)
+	storage.CreateTableUserBots(strg)
 
 	userSessionStore := auth.NewUserSessionStore(sessionStore, auth.WithAuthStatusCheck(), auth.WithSessionLifeTime(time.Hour*24*5))
 
