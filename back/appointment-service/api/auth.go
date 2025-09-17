@@ -97,7 +97,8 @@ func LogoutHandler(store *auth.UserSessionStore) http.HandlerFunc {
 	}
 }
 
-func CheckAuthHandler(store *auth.UserSessionStore, uc ExistingUserCheck, next http.Handler, noAuth http.Handler) http.HandlerFunc {
+// TODO add bearer token check
+func CheckCookieAuthHandler(store *auth.UserSessionStore, uc ExistingUserCheck, next http.Handler, noAuth http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, err := store.AuthenticationCheck(r)
 

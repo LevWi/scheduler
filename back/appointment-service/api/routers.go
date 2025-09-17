@@ -98,25 +98,26 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots/{business_id}",
+			//TODO add Cookie or Bearer token check
 			SlotsBusinessIdPostFunc(storage, storage),
 		},
 		Route{
 			"AddBusinessRulePost",
 			"POST",
 			"/rrules",
-			CheckAuthHandler(sesStore, userCheck, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			CheckCookieAuthHandler(sesStore, userCheck, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"GetBusinessRule",
 			"GET",
 			"/rrules",
-			CheckAuthHandler(sesStore, userCheck, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			CheckCookieAuthHandler(sesStore, userCheck, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DelBusinessRule",
 			"DELETE",
 			"/rrules/{id}",
-			CheckAuthHandler(sesStore, userCheck, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			CheckCookieAuthHandler(sesStore, userCheck, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		// Route{
 		// 	"Login",
@@ -141,13 +142,26 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"Logout",
 			"POST",
 			"/logout",
-			CheckAuthHandler(sesStore, userCheck, LogoutHandler(sesStore), http.HandlerFunc(LoginRequired)),
+			CheckCookieAuthHandler(sesStore, userCheck, LogoutHandler(sesStore), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			CheckAuthHandler(sesStore, userCheck, DeleteUserHandler(sesStore, storage.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
+			CheckCookieAuthHandler(sesStore, userCheck, DeleteUserHandler(sesStore, storage.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
+		},
+
+		Route{
+			"UserBotAdd",
+			"POST",
+			"/user/bots",
+			CheckCookieAuthHandler(sesStore, userCheck, AddUserBotHandler(storage), http.HandlerFunc(LoginRequired)),
+		},
+		Route{
+			"UserBotDel",
+			"DELETE",
+			"/user/bots/{bot_id}",
+			CheckCookieAuthHandler(sesStore, userCheck, DeleteUserBotHandler(storage), http.HandlerFunc(LoginRequired)),
 		},
 	}
 
