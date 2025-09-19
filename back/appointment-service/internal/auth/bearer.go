@@ -11,7 +11,7 @@ import (
 var ErrWrongToken = errors.New("wrong token")
 
 type TokenChecker interface {
-	// Expected common.ErrNotFound ErrWrongToken
+	// Expected common.ErrNotFound ErrWrongToken common.ErrInvalidArgument
 	TokenCheck(clientID common.ID, token string) (common.ID, error)
 }
 
@@ -46,9 +46,7 @@ func (ba *BearerAuth) Authorization(r *http.Request) (common.ID, error) {
 
 	businessID, err := ba.TC.TokenCheck(clientID, token)
 	if err != nil {
-		if errors.Is(err, common.ErrNotFound) || errors.Is(err, ErrWrongToken) {
-			err = errors.Join(common.ErrUnauthorized, err)
-		}
+		err = errors.Join(common.ErrUnauthorized, err)
 		return "", fmt.Errorf("[Bearer Authorization]: %w", err)
 	}
 

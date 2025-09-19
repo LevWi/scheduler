@@ -23,8 +23,11 @@ type TokenCache struct {
 	tc    TokenChecker
 }
 
-// TODO add test
 func (tokenCache *TokenCache) TokenCheck(clientID common.ID, token string) (common.ID, error) {
+	if clientID == "" || token == "" {
+		return "", common.ErrInvalidArgument
+	}
+
 	var result *cachePayload
 	tokenCache.mu.Lock()
 	result = tokenCache.cache[clientID]
@@ -39,7 +42,7 @@ func (tokenCache *TokenCache) TokenCheck(clientID common.ID, token string) (comm
 	defer result.mu.Unlock()
 	result.lastRead = time.Now()
 
-	if !result.checked || result.token != token {
+	if !result.checked {
 		result.token = token
 		userID, err := tokenCache.tc.TokenCheck(clientID, token)
 		result.userID = userID
@@ -51,6 +54,10 @@ func (tokenCache *TokenCache) TokenCheck(clientID common.ID, token string) (comm
 			}
 		}
 		result.checked = true
+	}
+
+	if result.token != token {
+		return "", ErrWrongToken
 	}
 
 	return result.userID, result.err
