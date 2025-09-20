@@ -105,3 +105,27 @@ func TestBotIdUniqueness(t *testing.T) {
 	_, err = st.AddBot(botId, "hash2", businessId)
 	assert.Error(t, err)
 }
+
+func TestValidateBotToken(t *testing.T) {
+	st := newTestStorage(t)
+
+	botId := "bot_validate"
+	businessId := "biz_validate"
+	token := "token_secret"
+
+	_, err := st.AddBot(botId, token, businessId)
+	assert.NoError(t, err)
+
+	// Test case 1: Valid token
+	validatedBusinessId, err := st.ValidateBotToken(botId, token)
+	assert.NoError(t, err)
+	assert.Equal(t, businessId, validatedBusinessId)
+
+	// Test case 2: Invalid token
+	_, err = st.ValidateBotToken(botId, "wrong_token")
+	assert.ErrorIs(t, err, ErrTokenMismatch)
+
+	// Test case 3: Non-existent bot
+	_, err = st.ValidateBotToken("non_existent_bot", token)
+	assert.Error(t, err)
+}

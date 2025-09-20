@@ -1,10 +1,14 @@
 package storage
 
 import (
+	"errors"
+	common "scheduler/appointment-service/internal"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+//TODO separate it to another struct
 
 const queryCreateUserBotsTable = `CREATE TABLE IF NOT EXISTS "user_bots" (
     bot_id          TEXT PRIMARY KEY,
@@ -39,6 +43,29 @@ func (s *Storage) AddBot(botId, botToken, businessId string) (DbBot, error) {
 	var newBot DbBot
 	err = s.Get(&newBot, query, botId, string(botTokenHash), businessId)
 	return newBot, adjustDbError(err)
+}
+
+var ErrTokenMismatch = errors.New("token mismatch")
+
+func (s *Storage) ValidateBotToken(botID common.ID, token string) (common.ID, error) {
+	bot, err := s.GetBotByBotId(botID)
+	if err != nil {
+		return "", err
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(bot.BotTokenHash), []byte(token))
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return "", ErrTokenMismatch
+		}
+		return "", errors.Join(common.ErrInternal, err)
+	}
+	return bot.BusinessId, nil
+}
+
+func (s *Storage) GetBotByBotId(botId string) (DbBot, error) {
+	var bot DbBot
+	err := s.Get(&bot, `SELECT * FROM "user_bots" WHERE "bot_id" = $1;`, botId)
+	return bot, adjustDbError(err)
 }
 
 // No errors if no bots found
