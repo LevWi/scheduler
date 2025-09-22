@@ -80,6 +80,13 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 		panic(err)
 	}
 
+	botAuth := auth.BearerAuth{TC: auth.NewTokenCache((*auth.TokenStorage)(storage))}
+	botAuthMethod := AuthorizationMethodFunc(func(_ http.ResponseWriter, r *http.Request) (common.ID, error) {
+		return botAuth.Authorization(r)
+	})
+
+	cookieAuth := &CookieAuth{sesStore, userCheck}
+
 	//TODO add/remove business rules
 	var routes = Routes{
 		// Route{
@@ -95,29 +102,34 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			SlotsBusinessIdGetFunc(storage),
 		},
 		Route{
+			"SlotsBusinessIdPostFromBot",
+			"POST",
+			"/slots/bt",
+			AuthHandler(botAuthMethod, SlotsBusinessIdPostFunc(storage, storage), nil),
+		},
+		Route{
 			"SlotsBusinessIdPost",
 			"POST",
-			"/slots/{business_id}",
-			//TODO add Cookie or Bearer token check
-			SlotsBusinessIdPostFunc(storage, storage),
+			"/slots",
+			AuthHandler(cookieAuth, SlotsBusinessIdPostFunc(storage, storage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"AddBusinessRulePost",
 			"POST",
 			"/rrules",
-			CheckCookieAuthHandler(sesStore, userCheck, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"GetBusinessRule",
 			"GET",
 			"/rrules",
-			CheckCookieAuthHandler(sesStore, userCheck, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DelBusinessRule",
 			"DELETE",
 			"/rrules/{id}",
-			CheckCookieAuthHandler(sesStore, userCheck, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		// Route{
 		// 	"Login",
@@ -142,26 +154,26 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"Logout",
 			"POST",
 			"/logout",
-			CheckCookieAuthHandler(sesStore, userCheck, LogoutHandler(sesStore), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, LogoutHandler(sesStore), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			CheckCookieAuthHandler(sesStore, userCheck, DeleteUserHandler(sesStore, storage.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, DeleteUserHandler(sesStore, storage.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
 		},
 
 		Route{
 			"UserBotAdd",
 			"POST",
 			"/user/bots",
-			CheckCookieAuthHandler(sesStore, userCheck, AddUserBotHandler(storage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, AddUserBotHandler(storage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"UserBotDel",
 			"DELETE",
 			"/user/bots/{bot_id}",
-			CheckCookieAuthHandler(sesStore, userCheck, DeleteUserBotHandler(storage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(cookieAuth, DeleteUserBotHandler(storage), http.HandlerFunc(LoginRequired)),
 		},
 	}
 

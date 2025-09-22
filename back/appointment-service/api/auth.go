@@ -23,9 +23,58 @@ type AuthUserCheck interface {
 	Check(username string, password string) (UserID, error)
 }
 
+type AuthorizationMethod interface {
+	Authorization(w http.ResponseWriter, r *http.Request) (common.ID, error)
+}
+
+type AuthorizationMethodFunc func(w http.ResponseWriter, r *http.Request) (common.ID, error)
+
+func (f AuthorizationMethodFunc) Authorization(w http.ResponseWriter, r *http.Request) (common.ID, error) {
+	return f(w, r)
+}
+
 func GetUserID(c context.Context) (UserID, bool) {
 	uid, ok := c.Value(UserIdKey{}).(string)
 	return UserID(uid), ok
+}
+
+type CookieAuth struct {
+	Store     *auth.UserSessionStore
+	UserCheck ExistingUserCheck
+}
+
+func (ca *CookieAuth) Authorization(w http.ResponseWriter, r *http.Request) (common.ID, error) {
+	uid, err := ca.Store.AuthenticationCheck(r)
+	if err != nil {
+		slog.WarnContext(r.Context(), "[CookieAuth.Authorization] ", "err", err.Error())
+		return "", err
+	}
+
+	//TODO can we avoid it in the next steps by erasing uid field?
+	err = ca.UserCheck.IsExist(uid)
+	if err != nil {
+		slog.WarnContext(r.Context(), "[CookieAuth.Authorization] ", "err", err.Error())
+		return "", errors.Join(err, ca.Store.Reset(w, r))
+	}
+
+	return uid, err
+}
+
+func AuthHandler(authMethod AuthorizationMethod, next http.Handler, noAuth http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, err := authMethod.Authorization(w, r)
+		if err != nil {
+			slog.WarnContext(r.Context(), "[CheckAuthHandler]", "err", err.Error())
+			if noAuth != nil {
+				noAuth.ServeHTTP(w, r)
+				return
+			}
+			w.WriteHeader(http.StatusNetworkAuthenticationRequired)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserIdKey{}, uid)))
+	}
 }
 
 // Required application/x-www-form-urlencoded format
@@ -94,48 +143,6 @@ func LogoutHandler(store *auth.UserSessionStore) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}
-}
-
-// TODO add bearer token check
-func CheckCookieAuthHandler(store *auth.UserSessionStore, uc ExistingUserCheck, next http.Handler, noAuth http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		uid, err := store.AuthenticationCheck(r)
-
-		if err != nil {
-			if errors.Is(err, common.ErrUnauthorized) {
-				goto noAuthHandler
-			}
-			slog.WarnContext(r.Context(), "[CheckAuthHandler] unexpected", "err", err.Error())
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		//TODO can we avoid it in the next steps by erasing uid field?
-		err = uc.IsExist(uid)
-
-		if err != nil {
-			if errors.Is(err, common.ErrNotFound) {
-				goto noAuthHandler
-			}
-			slog.WarnContext(r.Context(), "sessions", "err", err.Error())
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserIdKey{}, uid)))
-		return
-
-	noAuthHandler:
-		err = store.Reset(w, r)
-		if noAuth != nil {
-			noAuth.ServeHTTP(w, r)
-			return
-		}
-		if err != nil {
-			slog.WarnContext(r.Context(), "[CheckAuthHandler]", "err", err.Error())
-		}
-		w.WriteHeader(http.StatusNetworkAuthenticationRequired)
 	}
 }
 

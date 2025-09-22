@@ -22,7 +22,7 @@ type BearerAuth struct {
 func getToken(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return "", errors.New("missing 'Authorization' header")
+		return "", fmt.Errorf("%w: 'Authorization' header", common.ErrNotFound)
 	}
 
 	parts := strings.SplitN(authHeader, " ", 2)
@@ -36,12 +36,12 @@ func getToken(r *http.Request) (string, error) {
 func (ba *BearerAuth) Authorization(r *http.Request) (common.ID, error) {
 	token, err := getToken(r)
 	if err != nil {
-		return "", fmt.Errorf("[Bearer Authorization]: %w", err)
+		return "", err
 	}
 
 	clientID := r.Header.Get("X-Client-ID")
 	if clientID == "" {
-		return "", errors.New("missing 'X-Client-ID' header")
+		return "", fmt.Errorf("%w: 'X-Client-ID' header", common.ErrNotFound)
 	}
 
 	businessID, err := ba.TC.TokenCheck(clientID, token)

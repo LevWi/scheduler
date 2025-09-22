@@ -96,12 +96,9 @@ func SlotsBusinessIdPostFunc(s *storage.Storage, te TokenToUserExchanger) http.H
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-		vars := mux.Vars(r)
-		businessID := vars["business_id"]
-		if businessID == "" {
-			slog.WarnContext(r.Context(), "business_id not found")
-			w.WriteHeader(http.StatusBadRequest)
-			return
+		businessID, ok := GetUserID(r.Context())
+		if !ok {
+			panic("businessId not found")
 		}
 
 		token := r.URL.Query().Get("token")
