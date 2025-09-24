@@ -103,7 +103,7 @@ func (m *MockTokenChecker) Reset() {
 
 func TestNewTokenCache(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	if cache == nil {
 		t.Fatal("NewTokenCache returned nil")
@@ -118,7 +118,7 @@ func TestNewTokenCache(t *testing.T) {
 
 func TestTokenCache_TokenCheck_FirstCall(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "valid_token"
@@ -141,7 +141,7 @@ func TestTokenCache_TokenCheck_FirstCall(t *testing.T) {
 
 func TestTokenCache_TokenCheck_CachedCall(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "valid_token"
@@ -175,7 +175,7 @@ func TestTokenCache_TokenCheck_CachedCall(t *testing.T) {
 
 func TestTokenCache_TokenCheck_DifferentToken(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token1 := "token1"
@@ -207,7 +207,7 @@ func TestTokenCache_TokenCheck_DifferentToken(t *testing.T) {
 
 func TestTokenCache_TokenCheck_NotFoundError(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "invalid_token"
@@ -226,7 +226,7 @@ func TestTokenCache_TokenCheck_NotFoundError(t *testing.T) {
 
 func TestTokenCache_TokenCheck_WrongTokenError(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "wrong_token"
@@ -245,7 +245,7 @@ func TestTokenCache_TokenCheck_WrongTokenError(t *testing.T) {
 
 func TestTokenCache_TokenCheck_CachedError(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "invalid_token"
@@ -275,7 +275,7 @@ func TestTokenCache_TokenCheck_CachedError(t *testing.T) {
 
 func TestTokenCache_TokenCheck_InternalError(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "some_token"
@@ -304,7 +304,7 @@ func TestTokenCache_TokenCheck_InternalError(t *testing.T) {
 
 func TestTokenCache_Forget(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "valid_token"
@@ -335,7 +335,7 @@ func TestTokenCache_Forget(t *testing.T) {
 
 func TestTokenCache_ConcurrentAccess(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	clientID := "client123"
 	token := "valid_token"
@@ -384,7 +384,7 @@ func TestTokenCache_ConcurrentAccess(t *testing.T) {
 
 func TestTokenCache_MultipleDifferentClients(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	client1 := "client1"
 	client2 := "client2"
@@ -430,7 +430,7 @@ func TestTokenCache_MultipleDifferentClients(t *testing.T) {
 
 func TestTokenCache_ForgetNonExistentClient(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	// Forgetting a non-existent client should not panic
 	cache.Forget("non_existent_client")
@@ -443,7 +443,7 @@ func TestTokenCache_ForgetNonExistentClient(t *testing.T) {
 
 func TestTokenCache_TokenCheck_EmptyValues(t *testing.T) {
 	mockTC := NewMockTokenChecker()
-	cache := NewTokenCache(mockTC)
+	cache := NewTokenCacheDefault(mockTC)
 
 	// Test with empty clientID
 	_, err := cache.TokenCheck("", "token")
@@ -466,5 +466,50 @@ func TestTokenCache_TokenCheck_EmptyValues(t *testing.T) {
 	// The mock should not be called at all
 	if mockTC.GetCallCount() != 0 {
 		t.Errorf("expected 0 calls to TokenChecker for invalid arguments, got %d", mockTC.GetCallCount())
+	}
+}
+
+func TestTokenCache_ForgetExpired(t *testing.T) {
+	mockTC := NewMockTokenChecker()
+	// Use a short lifetime for testing
+	cache := NewTokenCache(mockTC, 50*time.Millisecond)
+
+	client1 := "client1"
+	token1 := "token1"
+	user1 := "user1"
+
+	client2 := "client2"
+	token2 := "token2"
+	user2 := "user2"
+
+	mockTC.SetResponse(client1, token1, user1, nil)
+	mockTC.SetResponse(client2, token2, user2, nil)
+
+	// Populate the cache for client1
+	_, _ = cache.TokenCheck(client1, token1)
+
+	// Wait for a short period, but less than the cache lifetime
+	time.Sleep(20 * time.Millisecond)
+
+	// Populate the cache for client2
+	_, _ = cache.TokenCheck(client2, token2)
+
+	// Wait for a period that makes client1's entry expire, but not client2's
+	time.Sleep(40 * time.Millisecond)
+
+	cache.ForgetExpired()
+
+	// After ForgetExpired, client1 should be gone, but client2 should remain.
+
+	// This call for client1 should hit the mock again
+	_, _ = cache.TokenCheck(client1, token1)
+	if mockTC.GetCallCount() != 3 {
+		t.Errorf("expected 3 calls to TokenChecker (2 initial, 1 after expiry), got %d", mockTC.GetCallCount())
+	}
+
+	// This call for client2 should be cached
+	_, _ = cache.TokenCheck(client2, token2)
+	if mockTC.GetCallCount() != 3 { // Should not increase
+		t.Errorf("expected 3 calls to TokenChecker (client2 should be cached), got %d", mockTC.GetCallCount())
 	}
 }

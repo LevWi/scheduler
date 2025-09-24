@@ -39,6 +39,24 @@ func (uc userCheckWrap) Check(username string, password string) (UserID, error) 
 	return uc.CheckUserPassword(username, password)
 }
 
+func BotAuthMethod(storage *storage.Storage) AuthorizationMethodFunc {
+	cache := auth.NewTokenCacheDefault((*auth.TokenStorage)(storage))
+	type bearerAuthWrap struct {
+		auth.BearerAuth
+		shed *common.PeriodicCallback
+	}
+	wrp := bearerAuthWrap{
+		BearerAuth: auth.BearerAuth{TC: cache},
+		shed: common.NewPeriodicCallback(time.Minute*5, func() {
+			cleared := cache.ForgetExpired()
+			slog.Debug("[BotAuthMethod] PeriodicCallback", "cleared", cleared)
+		})}
+	wrp.shed.Start()
+	return AuthorizationMethodFunc(func(_ http.ResponseWriter, r *http.Request) (common.ID, error) {
+		return wrp.Authorization(r)
+	})
+}
+
 func NewUserSignIn(storage *storage.Storage, sesStore *auth.UserSessionStore) (*oidc.UserSignIn, error) {
 	//TODO move from here
 	oidcCfgProvider, err := oidc.NewOAuth2CfgProviderFromFile("./oauth_cfg.json")
@@ -80,11 +98,6 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 		panic(err)
 	}
 
-	botAuth := auth.BearerAuth{TC: auth.NewTokenCache((*auth.TokenStorage)(storage))}
-	botAuthMethod := AuthorizationMethodFunc(func(_ http.ResponseWriter, r *http.Request) (common.ID, error) {
-		return botAuth.Authorization(r)
-	})
-
 	cookieAuth := &CookieAuth{sesStore, userCheck}
 
 	//TODO add/remove business rules
@@ -105,7 +118,7 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"SlotsBusinessIdPostFromBot",
 			"POST",
 			"/slots/bt",
-			AuthHandler(botAuthMethod, SlotsBusinessIdPostFunc(storage, storage), nil),
+			AuthHandler(BotAuthMethod(storage), SlotsBusinessIdPostFunc(storage, storage), nil),
 		},
 		Route{
 			"SlotsBusinessIdPost",

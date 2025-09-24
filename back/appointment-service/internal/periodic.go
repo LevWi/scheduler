@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type PeriodicScheduler struct {
+type PeriodicCallback struct {
 	interval time.Duration
 	callback func()
 	ticker   *time.Ticker
@@ -14,14 +14,14 @@ type PeriodicScheduler struct {
 	mu sync.Mutex
 }
 
-func NewPeriodicScheduler(interval time.Duration, cb func()) *PeriodicScheduler {
-	return &PeriodicScheduler{
+func NewPeriodicCallback(interval time.Duration, cb func()) *PeriodicCallback {
+	return &PeriodicCallback{
 		interval: interval,
 		callback: cb,
 	}
 }
 
-func (p *PeriodicScheduler) Start() {
+func (p *PeriodicCallback) Start() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -44,7 +44,7 @@ func (p *PeriodicScheduler) Start() {
 	}()
 }
 
-func (p *PeriodicScheduler) Stop() {
+func (p *PeriodicCallback) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

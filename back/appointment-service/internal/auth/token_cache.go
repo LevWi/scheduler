@@ -18,9 +18,10 @@ type cachePayload struct {
 }
 
 type TokenCache struct {
-	mu    sync.Mutex
-	cache map[string]*cachePayload
-	tc    TokenChecker
+	mu       sync.Mutex
+	cache    map[string]*cachePayload
+	lifetime time.Duration
+	tc       TokenChecker
 }
 
 func (tokenCache *TokenCache) TokenCheck(clientID common.ID, token string) (common.ID, error) {
@@ -63,6 +64,24 @@ func (tokenCache *TokenCache) TokenCheck(clientID common.ID, token string) (comm
 	return result.userID, result.err
 }
 
+func (tokenCache *TokenCache) ForgetExpired() uint {
+	tokenCache.mu.Lock()
+	defer tokenCache.mu.Unlock()
+
+	var i uint
+	now := time.Now()
+	for clientID, payload := range tokenCache.cache {
+		if payload.mu.TryLock() {
+			if now.Sub(payload.lastRead) > tokenCache.lifetime {
+				i++
+				delete(tokenCache.cache, clientID)
+			}
+			payload.mu.Unlock()
+		}
+	}
+	return i
+}
+
 func (tokenCache *TokenCache) Forget(clientID common.ID) {
 	tokenCache.mu.Lock()
 	defer tokenCache.mu.Unlock()
@@ -71,9 +90,14 @@ func (tokenCache *TokenCache) Forget(clientID common.ID) {
 
 //TODO clear unused cached variables after period
 
-func NewTokenCache(tc TokenChecker) *TokenCache {
+func NewTokenCache(tc TokenChecker, cacheLifetime time.Duration) *TokenCache {
 	return &TokenCache{
-		cache: make(map[string]*cachePayload),
-		tc:    tc,
+		cache:    make(map[string]*cachePayload),
+		lifetime: cacheLifetime,
+		tc:       tc,
 	}
+}
+
+func NewTokenCacheDefault(tc TokenChecker) *TokenCache {
+	return NewTokenCache(tc, 10*time.Minute)
 }
