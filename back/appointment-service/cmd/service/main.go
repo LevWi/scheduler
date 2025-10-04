@@ -24,10 +24,10 @@ func main() {
 	slog.Info("Server started")
 
 	dbPath := "tmp_test.db" //TODO remove
-
 	db, err := sqlx.Open("sqlite3", dbPath)
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Error("Open db error", "err", err.Error())
+		log.Fatal(err)
 	}
 	defer db.Close()
 
@@ -45,5 +45,9 @@ func main() {
 
 	router := server.NewRouter(strg, userSessionStore)
 
-	log.Fatal(http.ListenAndServe(":8080", router)) //TODO
+	err = http.ListenAndServe(":8080", router)
+	if err != nil {
+		slog.Error("[http.ListenAndServe]", "err", err.Error())
+		log.Fatal(err)
+	}
 }

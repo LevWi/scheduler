@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -100,14 +99,7 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 
 	cookieAuth := &CookieAuth{sesStore, userCheck}
 
-	//TODO add/remove business rules
 	var routes = Routes{
-		// Route{
-		// 	"Index",
-		// 	"GET",
-		// 	"/",
-		// 	CheckAuthHandler(sesStore, userCheck, http.HandlerFunc(Index), http.HandlerFunc(LoginRequired)),
-		// },
 		Route{
 			"SlotsBusinessIdGet",
 			"GET",
@@ -144,6 +136,7 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 			"/rrules/{id}",
 			AuthHandler(cookieAuth, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
+		//Disabled for security reasons
 		// Route{
 		// 	"Login",
 		// 	"POST",
@@ -207,10 +200,6 @@ func NewRouter(storage *storage.Storage, sesStore *auth.UserSessionStore) *mux.R
 		Handler(http.StripPrefix("/front/", http.FileServer(http.Dir(os.Getenv("FRONT_PATH")))))
 
 	return router
-}
-
-func Index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Authentication success")
 }
 
 func LoginRequired(w http.ResponseWriter, r *http.Request) {
