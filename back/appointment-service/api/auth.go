@@ -46,14 +46,14 @@ type CookieAuth struct {
 func (ca *CookieAuth) Authorization(w http.ResponseWriter, r *http.Request) (common.ID, error) {
 	uid, err := ca.Store.AuthenticationCheck(r)
 	if err != nil {
-		slog.WarnContext(r.Context(), "[CookieAuth.Authorization] ", "err", err.Error())
+		slog.WarnContext(r.Context(), "[CookieAuth.Authorization]", "err", err.Error())
 		return "", err
 	}
 
 	//TODO can we avoid it in the next steps by erasing uid field?
 	err = ca.UserCheck.IsExist(uid)
 	if err != nil {
-		slog.WarnContext(r.Context(), "[CookieAuth.Authorization] ", "err", err.Error())
+		slog.WarnContext(r.Context(), "[CookieAuth.Authorization]", "err", err.Error())
 		return "", errors.Join(err, ca.Store.Reset(w, r))
 	}
 

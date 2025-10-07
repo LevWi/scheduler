@@ -12,10 +12,10 @@ type OAuth2CfgCacheProvider struct {
 	cache *oauth2.Config
 }
 
-func NewOAuth2CfgProviderFromFile(file string, scope ...string) (OAuth2CfgCacheProvider, error) {
+func NewOAuth2CfgProviderFromFile(file string, scope ...string) (*OAuth2CfgCacheProvider, error) {
 	raw, err := os.ReadFile(file)
 	if err != nil {
-		return OAuth2CfgCacheProvider{}, fmt.Errorf("read oauth2 cfg file: %w", err)
+		return nil, fmt.Errorf("read oauth2 cfg file: %w", err)
 	}
 
 	if len(scope) == 0 {
@@ -23,10 +23,10 @@ func NewOAuth2CfgProviderFromFile(file string, scope ...string) (OAuth2CfgCacheP
 	}
 	cfg, err := google.ConfigFromJSON(raw, scope...)
 	if err != nil {
-		return OAuth2CfgCacheProvider{}, fmt.Errorf("parse oauth2 cfg file: %w", err)
+		return nil, fmt.Errorf("parse oauth2 cfg file: %w", err)
 	}
 
-	return OAuth2CfgCacheProvider{cache: cfg}, nil
+	return &OAuth2CfgCacheProvider{cache: cfg}, nil
 }
 
 func (p *OAuth2CfgCacheProvider) GetOAuth2Cfg() (*oauth2.Config, error) {

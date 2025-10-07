@@ -11,14 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testConfig struct {
+	Server struct {
+		Host string `koanf:"host"`
+		Port int    `koanf:"port"`
+	} `koanf:"server"`
+
+	DB struct {
+		User string `koanf:"user"`
+		Pass string `koanf:"pass"`
+	} `koanf:"db"`
+}
+
 func TestMain(m *testing.M) {
 	cleanupEnvs("TestMain")
 	os.Exit(m.Run())
 }
 
 func TestLoadConfig_OnlyEnvVars(t *testing.T) {
-	t.Setenv("SHED_DATABASE_HOST", "localhost")
-	t.Setenv("SHED_DATABASE_PORT", "5432")
+	t.Setenv("SHED_DATABASE__HOST", "localhost")
+	t.Setenv("SHED_DATABASE__PORT", "5432")
 	t.Setenv("SHED_APP_NAME", "test-app")
 
 	cfg, err := LoadConfig()
@@ -27,7 +39,27 @@ func TestLoadConfig_OnlyEnvVars(t *testing.T) {
 
 	assert.Equal(t, "localhost", cfg.String("database.host"))
 	assert.Equal(t, "5432", cfg.String("database.port"))
-	assert.Equal(t, "test-app", cfg.String("app.name"))
+	assert.Equal(t, "test-app", cfg.String("app_name"))
+}
+
+func TestLoadConfig_UnmarshalEnv(t *testing.T) {
+	t.Setenv("SHED_SERVER__HOST", "localhost")
+	t.Setenv("SHED_SERVER__PORT", "8080")
+	t.Setenv("SHED_DB__USER", "admin")
+	t.Setenv("SHED_DB__PASS", "secret")
+
+	k, err := LoadConfig()
+	require.NoError(t, err)
+	require.NotNil(t, k)
+
+	var cfg testConfig
+	err = k.Unmarshal("", &cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, "localhost", cfg.Server.Host)
+	require.Equal(t, 8080, cfg.Server.Port)
+	require.Equal(t, "admin", cfg.DB.User)
+	require.Equal(t, "secret", cfg.DB.Pass)
 }
 
 func TestLoadConfig_OnlyYamlFile(t *testing.T) {
@@ -64,8 +96,8 @@ app:
 	t.Setenv("SHED_CONFIG_PATH", yamlPath)
 
 	// override YAML
-	t.Setenv("SHED_DATABASE_HOST", "env-host")
-	t.Setenv("SHED_APP_NAME", "env-app")
+	t.Setenv("SHED_DATABASE__HOST", "env-host")
+	t.Setenv("SHED_APP__NAME", "env-app")
 
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
@@ -77,9 +109,9 @@ app:
 }
 
 func TestLoadConfig_NestedEnvVars(t *testing.T) {
-	t.Setenv("SHED_SERVER_HTTP_HOST", "0.0.0.0")
-	t.Setenv("SHED_SERVER_HTTP_PORT", "8080")
-	t.Setenv("SHED_SERVER_GRPC_PORT", "9090")
+	t.Setenv("SHED_SERVER__HTTP__HOST", "0.0.0.0")
+	t.Setenv("SHED_SERVER__HTTP__PORT", "8080")
+	t.Setenv("SHED_SERVER__GRPC__PORT", "9090")
 
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
@@ -121,8 +153,8 @@ func TestLoadConfig_EmptyConfig(t *testing.T) {
 }
 
 func TestLoadConfig_SpecialCharacters(t *testing.T) {
-	t.Setenv("SHED_APP_SECRET", "my$ecret!@#")
-	t.Setenv("SHED_APP_URL", "https://example.com/path?query=value")
+	t.Setenv("SHED_APP__SECRET", "my$ecret!@#")
+	t.Setenv("SHED_APP__URL", "https://example.com/path?query=value")
 
 	cfg, err := LoadConfig()
 	require.NoError(t, err)

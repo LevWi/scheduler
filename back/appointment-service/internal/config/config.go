@@ -10,12 +10,11 @@ import (
 	"github.com/knadh/koanf/v2"
 )
 
-var k = koanf.New(".")
-
 const envPrefix = "SHED_"
 const envConfigPath = envPrefix + "CONFIG_PATH"
 
 func LoadConfig() (*koanf.Koanf, error) {
+	k := koanf.New(".")
 	yamlPath := os.Getenv(envConfigPath)
 	if yamlPath != "" {
 		if err := k.Load(file.Provider(yamlPath), yaml.Parser()); err != nil {
@@ -26,7 +25,8 @@ func LoadConfig() (*koanf.Koanf, error) {
 	if err := k.Load(env.Provider(".", env.Opt{
 		Prefix: envPrefix,
 		TransformFunc: func(k, v string) (string, any) {
-			k = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(k, envPrefix)), "_", ".")
+			//SHED_SERVER__CONFIG_FILE --> server.config_file
+			k = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(k, envPrefix)), "__", ".")
 			return k, v
 		},
 	}), nil); err != nil {
