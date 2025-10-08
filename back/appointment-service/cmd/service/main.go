@@ -18,16 +18,19 @@ import (
 )
 
 func main() {
-	logger := common.NewLoggerWithCtxHandler(slog.NewTextHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
-
-	slog.Info("Server started")
-
 	cfg, err := LoadServiceConfig()
 	if err != nil {
 		slog.Error("[LoadServiceConfig]", "err", err.Error())
 		log.Fatal(err)
 	}
+
+	opts := &slog.HandlerOptions{
+		Level: cfg.LogLevel,
+	}
+	logger := common.NewLoggerWithCtxHandler(slog.NewTextHandler(os.Stdout, opts))
+	slog.SetDefault(logger)
+
+	slog.Info("Server started")
 
 	db, err := sqlx.Connect(cfg.DB.Driver, cfg.DB.Connection)
 	if err != nil {

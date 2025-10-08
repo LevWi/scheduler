@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -10,10 +11,10 @@ import (
 	"github.com/knadh/koanf/v2"
 )
 
-const envPrefix = "SHED_"
+const envPrefix = "SCHED_"
 const envConfigPath = envPrefix + "CONFIG_PATH"
 
-func LoadConfig() (*koanf.Koanf, error) {
+func LoadConfigRaw() (*koanf.Koanf, error) {
 	k := koanf.New(".")
 	yamlPath := os.Getenv(envConfigPath)
 	if yamlPath != "" {
@@ -25,7 +26,7 @@ func LoadConfig() (*koanf.Koanf, error) {
 	if err := k.Load(env.Provider(".", env.Opt{
 		Prefix: envPrefix,
 		TransformFunc: func(k, v string) (string, any) {
-			//SHED_SERVER__CONFIG_FILE --> server.config_file
+			//SCHED_SERVER__CONFIG_FILE --> server.config_file
 			k = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(k, envPrefix)), "__", ".")
 			return k, v
 		},
@@ -34,4 +35,39 @@ func LoadConfig() (*koanf.Koanf, error) {
 	}
 
 	return k, nil
+}
+
+func configErr(err error) error {
+	return fmt.Errorf("config err: %w", err)
+}
+
+func LoadConfigTo(tag string, out any) error {
+	k, err := LoadConfigRaw()
+	if err != nil {
+		return configErr(err)
+	}
+
+	err = k.UnmarshalWithConf("", out, koanf.UnmarshalConf{Tag: tag, FlatPaths: false})
+	if err != nil {
+		return configErr(err)
+	}
+
+	return nil
+}
+
+type Validator interface {
+	Validate() error
+}
+
+func LoadAndCheckConfig(tag string, out Validator) error {
+	err := LoadConfigTo(tag, out)
+	if err != nil {
+		return err
+	}
+
+	if err = out.Validate(); err != nil {
+		return configErr(err)
+	}
+
+	return nil
 }

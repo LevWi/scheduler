@@ -2,13 +2,10 @@ package main
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"scheduler/appointment-service/internal/config"
-
-	"github.com/knadh/koanf/v2"
 )
 
-// TODO add log level
 type ServiceConfig struct {
 	SessionsKey string `cfg:"sessions_key"`
 	Addr        string `cfg:"addr"`
@@ -19,7 +16,8 @@ type ServiceConfig struct {
 	Auth struct {
 		OAuthGoogleConfig string `cfg:"oauth_google_config"`
 	} `cfg:"auth"`
-	FrontPath string `cfg:"front_path"`
+	LogLevel  slog.Level `cfg:"log_level"`
+	FrontPath string     `cfg:"front_path"`
 }
 
 func (c *ServiceConfig) Validate() error {
@@ -44,24 +42,11 @@ func (c *ServiceConfig) Validate() error {
 	return nil
 }
 
-func configErr(err error) error {
-	return fmt.Errorf("config err: %w", err)
-}
-
 func LoadServiceConfig() (*ServiceConfig, error) {
-	k, err := config.LoadConfig()
+	var cfg ServiceConfig
+	err := config.LoadAndCheckConfig("cfg", &cfg)
 	if err != nil {
-		return nil, configErr(err)
+		return nil, err
 	}
-
-	var config ServiceConfig
-	err = k.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "cfg", FlatPaths: false})
-	if err != nil {
-		return nil, configErr(err)
-	}
-
-	if err = config.Validate(); err != nil {
-		return nil, configErr(err)
-	}
-	return &config, nil
+	return &cfg, nil
 }
