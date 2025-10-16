@@ -1,4 +1,4 @@
-package storage
+package slots
 
 import (
 	common "scheduler/appointment-service/internal"
@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type Storage struct {
+type TimeSlotsStorage struct {
 	*sqlx.DB
 }
 
@@ -34,40 +34,7 @@ type DbBusinessRule struct {
 	Rule DBRule
 }
 
-// TODO IF NOT EXISTS
-const queryCreateAppointmentsTable = `CREATE TABLE "appointments" (
-	"date_start"	  INTEGER NOT NULL,
-	"date_end"	  INTEGER NOT NULL,
-	"business_id" TEXT NOT NULL,
-	"client_id"	  TEXT NOT NULL,
-	UNIQUE (business_id, date_start)
-);`
-
-// TODO add exclude type rule
-const createBusinessTable = `CREATE TABLE "business_work_rule" (
-	"id" TEXT NOT NULL,
-	"business_id" TEXT NOT NULL,
-	"rule"	  TEXT NOT NULL,
-	UNIQUE (id, business_id)
-);`
-
-func CreateTableAppointments(db *Storage) error {
-	_, err := db.Exec(queryCreateAppointmentsTable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func CreateBusinessTable(db *Storage) error {
-	_, err := db.Exec(createBusinessTable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (db *Storage) GetBusinessRules(business_id common.ID) ([]DbBusinessRule, error) {
+func (db *TimeSlotsStorage) GetBusinessRules(business_id common.ID) ([]DbBusinessRule, error) {
 	var rules []DbBusinessRule
 	err := db.Select(&rules, "SELECT id, rule FROM business_work_rule WHERE business_id = $1",
 		string(business_id))
@@ -80,7 +47,7 @@ func (db *Storage) GetBusinessRules(business_id common.ID) ([]DbBusinessRule, er
 
 // TODO check that rule valid ?
 // TODO return business rule id ?
-func (db *Storage) AddBusinessRule(businessID string, rule DBRule) error {
+func (db *TimeSlotsStorage) AddBusinessRule(businessID string, rule DBRule) error {
 	newID := uuid.New().String()
 
 	_, err := db.Exec(`
@@ -92,14 +59,14 @@ func (db *Storage) AddBusinessRule(businessID string, rule DBRule) error {
 
 // TODO is value deletion confirm needed?
 // TODO Do not delete permanently
-func (db *Storage) DeleteBusinessRule(business_id common.ID, id string) error {
+func (db *TimeSlotsStorage) DeleteBusinessRule(business_id common.ID, id string) error {
 	_, err := db.Exec("DELETE FROM business_work_rule WHERE business_id = $1 AND id = $2",
 		business_id, id)
 	return err
 }
 
 // TODO add test
-func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, between common.Interval) (common.Intervals, error) {
+func (db *TimeSlotsStorage) GetAvailableSlotsInRange(business_id common.ID, between common.Interval) (common.Intervals, error) {
 	var rules []DBRule
 	err := db.Select(&rules, "SELECT rule FROM business_work_rule WHERE business_id = $1", string(business_id))
 	if err != nil {
@@ -132,7 +99,7 @@ func (db *Storage) GetAvailableSlotsInRange(business_id common.ID, between commo
 	return intervals, nil
 }
 
-func (db *Storage) GetBusySlotsInRange(business_id common.ID, between common.Interval) ([]common.BusySlot, error) {
+func (db *TimeSlotsStorage) GetBusySlotsInRange(business_id common.ID, between common.Interval) ([]common.BusySlot, error) {
 	var dbSlots []dbBusySlot
 	err := db.Select(&dbSlots, "SELECT * FROM appointments WHERE business_id = $1 AND date_start BETWEEN $2 AND $3",
 		string(business_id), between.Start.Unix(), between.End.Unix())
@@ -147,7 +114,7 @@ func (db *Storage) GetBusySlotsInRange(business_id common.ID, between common.Int
 	return slotsOut, nil
 }
 
-func (db *Storage) DeleteSlots(business_id common.ID, client_id common.ID, start time.Time, end time.Time) error {
+func (db *TimeSlotsStorage) DeleteSlots(business_id common.ID, client_id common.ID, start time.Time, end time.Time) error {
 	_, err := db.Exec("DELETE FROM appointments WHERE business_id = $1 AND client_id = $2 AND date_start BETWEEN $3 AND $4",
 		business_id, client_id, start.Unix(), end.Unix())
 	return err
@@ -160,7 +127,7 @@ type AddSlotsData struct {
 }
 
 // expected that no intersections in range
-func (db *Storage) AddSlots(in AddSlotsData) error {
+func (db *TimeSlotsStorage) AddSlots(in AddSlotsData) error {
 	dbSlots := make([]dbBusySlot, 0, len(in.Slots))
 	for _, slot := range in.Slots {
 		dbSlots = append(dbSlots, dbBusySlot{Client: in.Client, Business: in.Business, DateStart: slot.Start.Unix(), DateEnd: slot.End.Unix()})

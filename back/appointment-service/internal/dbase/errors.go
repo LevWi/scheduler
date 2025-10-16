@@ -1,4 +1,4 @@
-package storage
+package dbase
 
 import (
 	"database/sql"
@@ -7,7 +7,7 @@ import (
 	common "scheduler/appointment-service/internal"
 )
 
-func adjustDbError(e error) error {
+func DbError(e error) error {
 	if e == nil {
 		return nil
 	}

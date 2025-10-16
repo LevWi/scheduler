@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"scheduler/appointment-service/internal/dbase/test"
 	"testing"
 	"time"
 
@@ -9,16 +10,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func newTestStorage(t *testing.T) *Storage {
-	st := initDB(t)
-	err := CreateTableUserBots(&st)
-	assert.NoError(t, err)
-
-	return &st
-}
-
 func TestAddAndGetBot(t *testing.T) {
-	st := newTestStorage(t)
+	st := BotsStorage{test.InitTmpDB(t)}
 
 	botId := "bot_123"
 	tokenHash := "hash_abc"
@@ -51,7 +44,7 @@ func TestAddAndGetBot(t *testing.T) {
 }
 
 func TestEditBotStatus(t *testing.T) {
-	st := newTestStorage(t)
+	st := BotsStorage{test.InitTmpDB(t)}
 
 	botId := "bot_456"
 	businessId := "biz_2"
@@ -77,7 +70,7 @@ func TestEditBotStatus(t *testing.T) {
 }
 
 func TestDeleteBot(t *testing.T) {
-	st := newTestStorage(t)
+	st := BotsStorage{test.InitTmpDB(t)}
 
 	botId := "bot_789"
 	businessId := "biz_3"
@@ -94,7 +87,7 @@ func TestDeleteBot(t *testing.T) {
 }
 
 func TestBotIdUniqueness(t *testing.T) {
-	st := newTestStorage(t)
+	st := BotsStorage{test.InitTmpDB(t)}
 
 	botId := "bot_unique"
 	businessId := "biz_uniq"
@@ -107,7 +100,7 @@ func TestBotIdUniqueness(t *testing.T) {
 }
 
 func TestValidateBotToken(t *testing.T) {
-	st := newTestStorage(t)
+	st := BotsStorage{test.InitTmpDB(t)}
 
 	botId := "bot_validate"
 	businessId := "biz_validate"

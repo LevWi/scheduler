@@ -3,23 +3,23 @@ package server
 import (
 	"encoding/json"
 	common "scheduler/appointment-service/internal"
-	"scheduler/appointment-service/internal/storage"
+	"scheduler/appointment-service/internal/dbase/backend/slots"
 )
 
 type rruleStorage struct {
-	*storage.Storage
+	*slots.TimeSlotsStorage
 }
 
 func (r *rruleStorage) AddRRule(user common.ID, rule RRuleWithType) error {
-	return r.Storage.AddBusinessRule(user, rule.JSON)
+	return r.TimeSlotsStorage.AddBusinessRule(user, rule.JSON)
 }
 
 func (r *rruleStorage) RemoveRRule(user common.ID, ruleId common.ID) error {
-	return r.Storage.DeleteBusinessRule(user, ruleId)
+	return r.TimeSlotsStorage.DeleteBusinessRule(user, ruleId)
 }
 
 func (r *rruleStorage) GetRRules(user common.ID) ([]RRuleResult, error) {
-	dbRules, err := r.Storage.GetBusinessRules(user)
+	dbRules, err := r.TimeSlotsStorage.GetBusinessRules(user)
 
 	if err != nil {
 		return nil, err

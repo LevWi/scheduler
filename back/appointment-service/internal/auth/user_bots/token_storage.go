@@ -3,13 +3,15 @@ package auth
 import (
 	"errors"
 	common "scheduler/appointment-service/internal"
-	"scheduler/appointment-service/internal/storage"
+	storage "scheduler/appointment-service/internal/dbase/user_bots"
 )
 
-type TokenStorage storage.Storage
+type TokenStorage struct {
+	*storage.BotsStorage
+}
 
 func (s *TokenStorage) TokenCheck(clientID common.ID, token string) (common.ID, error) {
-	businessID, err := (*storage.Storage)(s).ValidateBotToken(clientID, token)
+	businessID, err := s.ValidateBotToken(clientID, token)
 	if errors.Is(err, storage.ErrTokenMismatch) {
 		err = ErrWrongToken
 	}

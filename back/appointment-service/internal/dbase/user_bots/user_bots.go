@@ -3,21 +3,16 @@ package storage
 import (
 	"errors"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/dbase"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
 
-//TODO separate it to another struct
-
-const queryCreateUserBotsTable = `CREATE TABLE IF NOT EXISTS "user_bots" (
-    bot_id          TEXT PRIMARY KEY,
-    bot_token_hash  TEXT NOT NULL,
-    business_id     TEXT NOT NULL,
-    is_active       BOOLEAN NOT NULL DEFAULT 1,
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_used_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-);`
+type BotsStorage struct {
+	*sqlx.DB
+}
 
 type DbBot struct {
 	BotId        string    `db:"bot_id"`
@@ -28,12 +23,7 @@ type DbBot struct {
 	LastUsedAt   time.Time `db:"last_used_at"`
 }
 
-func CreateTableUserBots(db *Storage) error {
-	_, err := db.Exec(queryCreateUserBotsTable)
-	return adjustDbError(err)
-}
-
-func (s *Storage) AddBot(botId, botToken, businessId string) (DbBot, error) {
+func (s *BotsStorage) AddBot(botId, botToken, businessId string) (DbBot, error) {
 	botTokenHash, err := bcrypt.GenerateFromPassword([]byte(botToken), bcrypt.DefaultCost)
 	if err != nil {
 		return DbBot{}, err
@@ -42,12 +32,12 @@ func (s *Storage) AddBot(botId, botToken, businessId string) (DbBot, error) {
 	query := `INSERT INTO "user_bots" ("bot_id", "bot_token_hash", "business_id") VALUES ($1, $2, $3) RETURNING *;`
 	var newBot DbBot
 	err = s.Get(&newBot, query, botId, string(botTokenHash), businessId)
-	return newBot, adjustDbError(err)
+	return newBot, dbase.DbError(err)
 }
 
 var ErrTokenMismatch = errors.New("token mismatch")
 
-func (s *Storage) ValidateBotToken(botID common.ID, token string) (common.ID, error) {
+func (s *BotsStorage) ValidateBotToken(botID common.ID, token string) (common.ID, error) {
 	bot, err := s.GetBotByBotId(botID)
 	if err != nil {
 		return "", err
@@ -62,28 +52,28 @@ func (s *Storage) ValidateBotToken(botID common.ID, token string) (common.ID, er
 	return bot.BusinessId, nil
 }
 
-func (s *Storage) GetBotByBotId(botId string) (DbBot, error) {
+func (s *BotsStorage) GetBotByBotId(botId string) (DbBot, error) {
 	var bot DbBot
 	err := s.Get(&bot, `SELECT * FROM "user_bots" WHERE "bot_id" = $1;`, botId)
-	return bot, adjustDbError(err)
+	return bot, dbase.DbError(err)
 }
 
 // No errors if no bots found
-func (s *Storage) GetBots(businessId string) ([]DbBot, error) {
+func (s *BotsStorage) GetBots(businessId string) ([]DbBot, error) {
 	query := `SELECT * FROM "user_bots" WHERE "business_id" = $1;`
 	var bots []DbBot
 	err := s.Select(&bots, query, businessId)
-	return bots, adjustDbError(err)
+	return bots, dbase.DbError(err)
 }
 
-func (s *Storage) EditBotStatus(businessId string, botId string, active bool) error {
+func (s *BotsStorage) EditBotStatus(businessId string, botId string, active bool) error {
 	query := `UPDATE "user_bots" SET "is_active" = $1 WHERE "business_id" = $2 AND "bot_id" = $3;`
 	_, err := s.Exec(query, active, businessId, botId)
-	return adjustDbError(err)
+	return dbase.DbError(err)
 }
 
-func (s *Storage) DeleteBot(businessId string, botId string) error {
+func (s *BotsStorage) DeleteBot(businessId string, botId string) error {
 	query := `DELETE FROM "user_bots" WHERE "business_id" = $1 AND "bot_id" = $2;`
 	_, err := s.Exec(query, businessId, botId)
-	return adjustDbError(err)
+	return dbase.DbError(err)
 }

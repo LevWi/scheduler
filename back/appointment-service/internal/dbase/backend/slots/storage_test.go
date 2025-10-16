@@ -1,4 +1,4 @@
-package storage
+package slots
 
 import (
 	"fmt"
@@ -7,33 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-
-	_ "github.com/mattn/go-sqlite3"
-
 	types "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/dbase/test"
 )
-
-func initDB(t *testing.T) Storage {
-	db, err := sqlx.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return Storage{DB: db}
-}
 
 func toInterval(start time.Time, end time.Time) types.Interval {
 	return types.Interval{Start: start, End: end}
 }
 
 func TestStorage(t *testing.T) {
-	storage := initDB(t)
+	storage := TimeSlotsStorage{test.InitTmpDB(t)}
 	defer storage.Close()
-
-	err := CreateTableAppointments(&storage)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	var appointments []AddSlotsData
 	{
@@ -52,7 +36,7 @@ func TestStorage(t *testing.T) {
 	}
 
 	for _, el := range appointments {
-		err = storage.AddSlots(el)
+		err := storage.AddSlots(el)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -98,25 +82,20 @@ func TestStorage(t *testing.T) {
 }
 
 func TestStorageBusinessRule(t *testing.T) {
-	storage := initDB(t)
+	storage := TimeSlotsStorage{test.InitTmpDB(t)}
 	defer storage.Close()
-
-	err := CreateBusinessTable(&storage)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	const businessName = "Business Name"
 	const rulesCount = 100
 	for x := range rulesCount {
-		err = storage.AddBusinessRule(businessName, "some_rule"+strconv.Itoa(x))
+		err := storage.AddBusinessRule(businessName, "some_rule"+strconv.Itoa(x))
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	var count int
-	err = storage.Get(&count, "SELECT COUNT(*) FROM business_work_rule WHERE rule = \"some_rule42\"")
+	err := storage.Get(&count, "SELECT COUNT(*) FROM business_work_rule WHERE rule = \"some_rule42\"")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,45 +1,32 @@
-package storage
+package auth
 
 import (
 	"errors"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/dbase/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateUsersTable(t *testing.T) {
-	db := initDB(t)
-	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
-}
-
 func TestCreateUserPassword(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
 
 	user := "test_user"
 	password := "test_password"
 
-	_, err = db.CreateUserPassword(user, password)
+	_, err := db.CreateUserPassword(user, password)
 	assert.NoError(t, err)
 }
 
 func TestUserPasswordEmpty(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
 
 	user := "test_user"
 
-	_, err = db.CreateUserPassword(user, "")
+	_, err := db.CreateUserPassword(user, "")
 	assert.Equal(t, ErrEmptyPassword, err)
 
 	_, err = db.CheckUserPassword(user, "")
@@ -52,11 +39,8 @@ func TestUserPasswordEmpty(t *testing.T) {
 }
 
 func TestCheckUserPassword(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
 
 	user := "test_user"
 	password := "test_password"
@@ -78,11 +62,8 @@ func TestCheckUserPassword(t *testing.T) {
 }
 
 func TestUpdateUserPassword(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
 
 	user := "test_user"
 	oldPassword := "test_password"
@@ -111,16 +92,13 @@ func TestUpdateUserPassword(t *testing.T) {
 }
 
 func TestExistAndDelete(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
 
 	user := "test_user"
 	password := "test_password"
 
-	err = db.IsExist("")
+	err := db.IsExist("")
 	assert.Error(t, err)
 	assert.Equal(t, common.ErrNotFound, err)
 
@@ -147,11 +125,8 @@ func TestExistAndDelete(t *testing.T) {
 }
 
 func TestDeleteUser(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
 
 	user := "test_user"
 	password := "test_password"

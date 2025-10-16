@@ -1,8 +1,9 @@
-package storage
+package auth
 
 import (
 	"errors"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/dbase/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +11,8 @@ import (
 )
 
 func TestOIDCCreateUser(t *testing.T) {
-	db := initDB(t)
+	db := AuthStorage{test.InitTmpDB(t)}
 	defer db.Close()
-
-	err := CreateUsersTable(&db)
-	assert.NoError(t, err)
-	err = CreateOIDCTable(&db)
-	assert.NoError(t, err)
 
 	in := OIDCData{
 		Provider: "google",
@@ -24,7 +20,7 @@ func TestOIDCCreateUser(t *testing.T) {
 	}
 	assert.True(t, in.IsValid())
 
-	err = db.OIDCPairWithUser("", in)
+	err := db.OIDCPairWithUser("", in)
 	require.Equal(t, common.ErrInvalidArgument, err)
 	err = db.OIDCPairWithUser("asdsad", OIDCData{})
 	require.Equal(t, common.ErrInvalidArgument, err)

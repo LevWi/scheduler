@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
-	"scheduler/appointment-service/internal/storage"
+	"scheduler/appointment-service/internal/dbase/auth"
 
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
@@ -13,7 +13,7 @@ import (
 )
 
 type OIDCAuthCheckImpl struct {
-	s          *storage.Storage
+	s          *auth.AuthStorage
 	jwkStorage jwkset.Storage
 }
 
@@ -39,7 +39,7 @@ func (c *OIDCAuthCheckImpl) AuthCheck(ctx context.Context, token *oauth2.Token) 
 		return
 	}
 
-	authData := storage.OIDCData{
+	authData := auth.OIDCData{
 		Provider: iss,
 		Subject:  sub,
 	}
@@ -47,7 +47,7 @@ func (c *OIDCAuthCheckImpl) AuthCheck(ctx context.Context, token *oauth2.Token) 
 	dbUid, err := c.s.OIDCUserAuth(authData)
 	if errors.Is(err, common.ErrNotFound) {
 		isNew = true
-		dbUid, err = c.s.OIDCCreateUser(storage.GenerateUsername(), authData)
+		dbUid, err = c.s.OIDCCreateUser(auth.GenerateUsername(), authData)
 	}
 	if err != nil {
 		return

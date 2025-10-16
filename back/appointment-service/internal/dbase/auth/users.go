@@ -1,9 +1,10 @@
-package storage
+package auth
 
 import (
 	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/dbase"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -12,26 +13,9 @@ import (
 var ErrWrongPassword = bcrypt.ErrMismatchedHashAndPassword
 var ErrEmptyPassword = fmt.Errorf("%w: password empty", common.ErrNotAllowed)
 
-const createUsersTable = `CREATE TABLE IF NOT EXISTS users (
-	id TEXT PRIMARY KEY,
-	username TEXT NOT NULL UNIQUE,
-	pwd_hash TEXT,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);`
-
-//TODO need updated_at handling
-
-func CreateUsersTable(db *Storage) error {
-	_, err := db.Exec(createUsersTable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
+// TODO need updated_at handling
 // TODO add checking requirements for password symbols somewhere
-func (db *Storage) CreateUserPassword(user string, password string) (UserID, error) {
+func (db *AuthStorage) CreateUserPassword(user string, password string) (UserID, error) {
 	if password == "" {
 		return "", ErrEmptyPassword
 	}
@@ -45,10 +29,10 @@ func (db *Storage) CreateUserPassword(user string, password string) (UserID, err
 	id := uuid.NewString()
 
 	_, err = db.Exec("INSERT INTO users (id, username, pwd_hash) VALUES ($1, $2, $3)", id, user, hashed)
-	return UserID(id), adjustDbError(err)
+	return UserID(id), dbase.DbError(err)
 }
 
-func (db *Storage) UpdateUserPassword(id UserID, oldPword string, newPword string) error {
+func (db *AuthStorage) UpdateUserPassword(id UserID, oldPword string, newPword string) error {
 	u, err := db.readUserByID(id)
 	if err != nil {
 		return err
@@ -64,10 +48,10 @@ func (db *Storage) UpdateUserPassword(id UserID, oldPword string, newPword strin
 	}
 
 	_, err = db.Exec("UPDATE users SET pwd_hash = $1 WHERE id = $2", newHash, id)
-	return adjustDbError(err)
+	return dbase.DbError(err)
 }
 
-func (db *Storage) CheckUserPassword(user, password string) (UserID, error) {
+func (db *AuthStorage) CheckUserPassword(user, password string) (UserID, error) {
 	u, err := db.readUser(user)
 	if err != nil {
 		return "", err
@@ -75,13 +59,13 @@ func (db *Storage) CheckUserPassword(user, password string) (UserID, error) {
 	return UserID(u.Id), checkPassword(u.PwdHash, password)
 }
 
-func (db *Storage) DeleteUser(id UserID) error {
+func (db *AuthStorage) DeleteUser(id UserID) error {
 	//TODO don't delete user. Update a status cell value
 	_, err := db.Exec("DELETE FROM users WHERE id = $1", id)
-	return adjustDbError(err)
+	return dbase.DbError(err)
 }
 
-func (db *Storage) DeleteUserWithCheck(user string, password string) error {
+func (db *AuthStorage) DeleteUserWithCheck(user string, password string) error {
 	u, err := db.readUser(user)
 	if err != nil {
 		return err
@@ -93,11 +77,11 @@ func (db *Storage) DeleteUserWithCheck(user string, password string) error {
 	return db.DeleteUser(UserID(u.Id))
 }
 
-func (db *Storage) IsExist(id UserID) error {
+func (db *AuthStorage) IsExist(id UserID) error {
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE id = $1", id)
 	if err != nil {
-		return adjustDbError(err)
+		return dbase.DbError(err)
 	}
 	if count == 0 {
 		return common.ErrNotFound
@@ -125,16 +109,16 @@ type User struct {
 	PwdHash  string
 }
 
-func (db *Storage) readUser(user string) (dbUser, error) {
+func (db *AuthStorage) readUser(user string) (dbUser, error) {
 	var dbUser dbUser
 	err := db.Get(&dbUser, "SELECT id, username, pwd_hash FROM users WHERE username = $1", user)
-	return dbUser, adjustDbError(err)
+	return dbUser, dbase.DbError(err)
 }
 
-func (db *Storage) readUserByID(id UserID) (dbUser, error) {
+func (db *AuthStorage) readUserByID(id UserID) (dbUser, error) {
 	var dbUser dbUser
 	err := db.Get(&dbUser, "SELECT id, username, pwd_hash FROM users WHERE id = $1", id)
-	return dbUser, adjustDbError(err)
+	return dbUser, dbase.DbError(err)
 }
 
 func checkPassword(hash, password string) error {

@@ -1,4 +1,4 @@
-package storage
+package auth
 
 import (
 	"testing"
@@ -7,30 +7,31 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/dbase/test"
 )
 
 func TestUserToken(t *testing.T) {
-	storage := initDB(t)
+	storage := AuthStorage{test.InitTmpDB(t)}
 	defer storage.Close()
 
-	err := CreateTableUserTokens(&storage)
-	assert.NoError(t, err)
-	userID := common.ID("user1")
+	businessID := "user1"
+	clientID := "client1"
 	token := "token1"
 	expiresAt := time.Now().Add(1 * time.Hour)
 
 	// Add a new token
-	err = storage.AddUserToken(userID, token, expiresAt)
+	err := storage.AddUserToken(businessID, clientID, token, expiresAt)
 	assert.NoError(t, err)
 
 	// Try to add the same token again, should update
-	err = storage.AddUserToken(userID, "new-token", expiresAt)
+	err = storage.AddUserToken(businessID, clientID, "new-token", expiresAt)
 	assert.NoError(t, err)
 
 	// Exchange the token
-	exchangedUserID, err := storage.ExchangeToken("new-token")
+	expected, err := storage.ExchangeToken("new-token")
 	assert.NoError(t, err)
-	assert.Equal(t, userID, exchangedUserID)
+	assert.Equal(t, businessID, expected.BusinessID)
+	assert.Equal(t, clientID, expected.ClientID)
 
 	// Try to exchange the same token again
 	_, err = storage.ExchangeToken("new-token")
@@ -42,9 +43,8 @@ func TestUserToken(t *testing.T) {
 
 	// Test expired token
 	expiredToken := "expired-token"
-	expiredUserID := common.ID("user2")
 	expiredExpiresAt := time.Now().Add(-1 * time.Hour)
-	err = storage.AddUserToken(expiredUserID, expiredToken, expiredExpiresAt)
+	err = storage.AddUserToken("user2", "client2", expiredToken, expiredExpiresAt)
 	assert.NoError(t, err)
 
 	_, err = storage.ExchangeToken(expiredToken)

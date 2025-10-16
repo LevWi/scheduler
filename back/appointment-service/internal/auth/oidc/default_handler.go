@@ -6,10 +6,10 @@ import (
 	"github.com/MicahParks/jwkset"
 
 	"scheduler/appointment-service/internal/auth/oidc/google"
-	db "scheduler/appointment-service/internal/storage"
+	"scheduler/appointment-service/internal/dbase/auth"
 )
 
-func NewOIDCAuthCheckDefault(ctx context.Context, dbase *db.Storage) (OIDCAuthCheck, error) {
+func NewOIDCAuthCheckDefault(ctx context.Context, dbase *auth.AuthStorage) (OIDCAuthCheck, error) {
 	//TODO make it with periodically update?
 	url, err := google.FetchGoogleJWKsUri(ctx)
 	if err != nil {
