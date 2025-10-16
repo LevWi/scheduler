@@ -10,7 +10,6 @@ import (
 	server "scheduler/appointment-service/api"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/auth"
-	"scheduler/appointment-service/internal/storage"
 
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -42,17 +41,10 @@ func main() {
 	sessionStore := sessions.NewCookieStore([]byte(cfg.SessionsKey))
 	sessionStore.MaxAge(86400 * 5) // 5 days
 
-	strg := &storage.Storage{DB: db}
-	storage.CreateOIDCTable(strg)
-	storage.CreateUsersTable(strg)
-	storage.CreateBusinessTable(strg)
-	storage.CreateTableAppointments(strg)
-	storage.CreateTableUserBots(strg)
-
 	//TODO move LifeTime to config?
 	userSessionStore := auth.NewUserSessionStore(sessionStore, auth.WithAuthStatusCheck(), auth.WithSessionLifeTime(time.Hour*24*5))
 
-	router := server.NewRouterBuilder(strg, userSessionStore).
+	router := server.NewRouterBuilder(db, userSessionStore).
 		AddTimeSlotsHandlers().
 		AddBusinessRulesHandlers().
 		AddUserAccountHandlers().

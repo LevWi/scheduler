@@ -11,7 +11,7 @@ import (
 )
 
 func TestUserToken(t *testing.T) {
-	storage := AuthStorage{test.InitTmpDB(t)}
+	storage := OneOffTokenStorage{test.InitTmpDB(t)}
 	defer storage.Close()
 
 	businessID := "user1"

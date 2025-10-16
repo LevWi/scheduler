@@ -6,12 +6,18 @@ import (
 
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/dbase"
+
+	"github.com/jmoiron/sqlx"
 )
 
 var (
 	ErrTokenAlreadyUsed = errors.New("token already used")
 	ErrTokenExpired     = errors.New("token expired")
 )
+
+type OneOffTokenStorage struct {
+	*sqlx.DB
+}
 
 type ClientID = common.ID
 type BusinessID = common.ID
@@ -24,7 +30,7 @@ type TokenEntry struct {
 	IsUsed     bool   `db:"is_used"`
 }
 
-func (db *AuthStorage) AddUserToken(businessID BusinessID, clientID ClientID,
+func (db *OneOffTokenStorage) AddUserToken(businessID BusinessID, clientID ClientID,
 	token string, expiresAt time.Time) error {
 	_, err := db.Exec(
 		`INSERT INTO user_tokens (business_id, client_id, token, expires_at, is_used)
@@ -37,7 +43,7 @@ func (db *AuthStorage) AddUserToken(businessID BusinessID, clientID ClientID,
 	return dbase.DbError(err)
 }
 
-func (db *AuthStorage) ExchangeToken(token string) (*TokenEntry, error) {
+func (db *OneOffTokenStorage) ExchangeToken(token string) (*TokenEntry, error) {
 	tx, err := db.Beginx()
 	if err != nil {
 		return nil, dbase.DbError(err)
@@ -93,7 +99,7 @@ func (db *AuthStorage) ExchangeToken(token string) (*TokenEntry, error) {
 	return &dbToken, nil
 }
 
-func (db *AuthStorage) CleanupExpiredTokens() error {
+func (db *OneOffTokenStorage) CleanupExpiredTokens() error {
 	_, err := db.Exec(`DELETE FROM user_tokens WHERE expires_at < $1`,
 		time.Now().Unix())
 	return dbase.DbError(err)

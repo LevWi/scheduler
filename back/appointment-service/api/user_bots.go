@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	common "scheduler/appointment-service/internal"
-	"scheduler/appointment-service/internal/storage"
+	"scheduler/appointment-service/internal/dbase/bots"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -16,7 +16,7 @@ type botResult struct {
 	BotToken string `json:"token"`
 }
 
-func AddUserBotHandler(s *storage.Storage) http.HandlerFunc {
+func AddUserBotHandler(s *bots.BotsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		businessId, ok := GetUserID(r.Context())
 		if !ok {
@@ -48,7 +48,7 @@ func AddUserBotHandler(s *storage.Storage) http.HandlerFunc {
 	}
 }
 
-func DeleteUserBotHandler(s *storage.Storage) http.HandlerFunc {
+func DeleteUserBotHandler(s *bots.BotsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		businessId, ok := GetUserID(r.Context())
 		if !ok {

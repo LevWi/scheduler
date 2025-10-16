@@ -9,9 +9,12 @@ import (
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/auth"
 	"scheduler/appointment-service/internal/auth/oidc"
-	"scheduler/appointment-service/internal/storage"
+	authdb "scheduler/appointment-service/internal/dbase/auth"
+	"scheduler/appointment-service/internal/dbase/backend/slots"
+	"scheduler/appointment-service/internal/dbase/bots"
 
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/time/rate"
 )
 
@@ -24,7 +27,7 @@ type Route struct {
 
 // TODO need to cache IsExist(uid) result with periodic update. With mutex
 type userCheckWrap struct {
-	*storage.Storage
+	*authdb.AuthStorage
 	table *common.LimitsTable[string]
 }
 
@@ -35,8 +38,9 @@ func (uc userCheckWrap) Check(username string, password string) (UserID, error) 
 	return uc.CheckUserPassword(username, password)
 }
 
-func BotAuthMethod(storage *storage.Storage) AuthorizationMethodFunc {
-	cache := auth.NewTokenCacheDefault((*auth.TokenStorage)(storage))
+// TODO Move logic to internal
+func botAuthMethod(storage *auth.BotTokenStorage) AuthorizationMethodFunc {
+	cache := auth.NewTokenCacheDefault(storage)
 	type bearerAuthWrap struct {
 		auth.BearerAuth
 		shed *common.PeriodicCallback
@@ -53,7 +57,7 @@ func BotAuthMethod(storage *storage.Storage) AuthorizationMethodFunc {
 	})
 }
 
-func newUserSignIn(storage *storage.Storage, sesStore *auth.UserSessionStore, configPath string) (*oidc.UserSignIn, error) {
+func newUserSignIn(storage *authdb.AuthStorage, sesStore *auth.UserSessionStore, configPath string) (*oidc.UserSignIn, error) {
 	//TODO move from here
 	oidcCfgProvider, err := oidc.NewOAuth2CfgProviderFromFile(configPath)
 	if err != nil {
@@ -77,14 +81,14 @@ func newUserSignIn(storage *storage.Storage, sesStore *auth.UserSessionStore, co
 
 type RouterBuilder struct {
 	_          common.NoCopy
-	storage    *storage.Storage
+	db         *sqlx.DB
 	sesStore   *auth.UserSessionStore
 	cookieAuth *CookieAuth
 
 	v *mux.Router
 }
 
-func NewRouterBuilder(storage *storage.Storage, sesStore *auth.UserSessionStore) *RouterBuilder {
+func NewRouterBuilder(db *sqlx.DB, sesStore *auth.UserSessionStore) *RouterBuilder {
 	var rb RouterBuilder
 	rb.v = mux.NewRouter().StrictSlash(true)
 
@@ -93,16 +97,18 @@ func NewRouterBuilder(storage *storage.Storage, sesStore *auth.UserSessionStore)
 		common.RequestLimitUpdateFunc(func(in *rate.Limiter) *rate.Limiter {
 			return rate.NewLimiter(rate.Every(time.Second*15), 1)
 		}))
-	userCheck := userCheckWrap{storage, restrictionTable}
+	userCheck := userCheckWrap{&authdb.AuthStorage{DB: db}, restrictionTable}
 	rb.cookieAuth = &CookieAuth{sesStore, userCheck}
 
-	rb.storage = storage
+	rb.db = db
 	rb.sesStore = sesStore
 	return &rb
 }
 
 // TODO need more logs
 func (rb *RouterBuilder) AddUserAccountHandlers() *RouterBuilder {
+	bs := bots.BotsStorage{DB: rb.db}
+	as := authdb.AuthStorage{DB: rb.db}
 	rb.addRoutes(
 		Route{
 			"Logout",
@@ -114,19 +120,19 @@ func (rb *RouterBuilder) AddUserAccountHandlers() *RouterBuilder {
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			AuthHandler(rb.cookieAuth, DeleteUserHandler(rb.sesStore, rb.storage.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
+			AuthHandler(rb.cookieAuth, DeleteUserHandler(rb.sesStore, as.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"UserBotAdd",
 			"POST",
 			"/user/bots",
-			AuthHandler(rb.cookieAuth, AddUserBotHandler(rb.storage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(rb.cookieAuth, AddUserBotHandler(&bs), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"UserBotDel",
 			"DELETE",
 			"/user/bots/{bot_id}",
-			AuthHandler(rb.cookieAuth, DeleteUserBotHandler(rb.storage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(rb.cookieAuth, DeleteUserBotHandler(&bs), http.HandlerFunc(LoginRequired)),
 		})
 
 	return rb
@@ -147,7 +153,8 @@ func (rb *RouterBuilder) addRoutes(routes ...Route) {
 }
 
 func (rb *RouterBuilder) AddOIDCHandlers(oauthCfgPath string) *RouterBuilder {
-	oidcUserSignIn, err := newUserSignIn(rb.storage, rb.sesStore, oauthCfgPath)
+	as := authdb.AuthStorage{DB: rb.db}
+	oidcUserSignIn, err := newUserSignIn(&as, rb.sesStore, oauthCfgPath)
 	if err != nil {
 		slog.Warn("[NewRouter]", "err", err.Error())
 		panic(err)
@@ -169,30 +176,40 @@ func (rb *RouterBuilder) AddOIDCHandlers(oauthCfgPath string) *RouterBuilder {
 }
 
 func (rb *RouterBuilder) AddTimeSlotsHandlers() *RouterBuilder {
+	ts := &slots.TimeSlotsStorage{DB: rb.db}
+	oneOffAuth := AddSlotsAuthOneOffToken(authdb.OneOffTokenStorage{DB: rb.db})
+	bs := auth.BotTokenStorage{BotsStorage: &bots.BotsStorage{DB: rb.db}}
 	rb.addRoutes(
 		Route{
 			"SlotsBusinessIdGet",
 			"GET",
 			"/slots/{business_id}",
-			SlotsBusinessIdGetFunc(rb.storage),
+			SlotsBusinessIdGetFunc(ts),
 		},
 		Route{
 			"SlotsBusinessIdPostFromBot",
 			"POST",
-			"/slots/bt",
-			AuthHandler(BotAuthMethod(rb.storage), SlotsBusinessIdPostFunc(rb.storage, rb.storage), nil),
+			"/slots/once",
+			SlotsBusinessIdPostFunc(&oneOffAuth, ts),
+		},
+		Route{
+			"SlotsBusinessIdPostFromBot",
+			"POST",
+			"/slots/off",
+			//SlotsBusinessIdPostFunc(&oneOffAuth, ts),
+			AuthHandler(botAuthMethod(&bs), SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}, ts), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots",
-			AuthHandler(rb.cookieAuth, SlotsBusinessIdPostFunc(rb.storage, rb.storage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(rb.cookieAuth, SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}, ts), http.HandlerFunc(LoginRequired)),
 		})
 	return rb
 }
 
 func (rb *RouterBuilder) AddBusinessRulesHandlers() *RouterBuilder {
-	ruleStorage := rruleStorage{rb.storage}
+	ruleStorage := rruleStorage{&slots.TimeSlotsStorage{DB: rb.db}}
 	rb.addRoutes(
 		Route{
 			"AddBusinessRulePost",

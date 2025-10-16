@@ -26,7 +26,7 @@ func LoadConfigRaw() (*koanf.Koanf, error) {
 	if err := k.Load(env.Provider(".", env.Opt{
 		Prefix: envPrefix,
 		TransformFunc: func(k, v string) (string, any) {
-			//SCHED_SERVER__CONFIG_FILE --> server.config_file
+			//SCHED__CONFIG_FILE --> server.config_file
 			k = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(k, envPrefix)), "__", ".")
 			return k, v
 		},

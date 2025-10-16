@@ -10,14 +10,11 @@ import (
 
 	swagger "scheduler/appointment-service/api/types"
 	common "scheduler/appointment-service/internal"
-	"scheduler/appointment-service/internal/storage"
+	"scheduler/appointment-service/internal/dbase/auth"
+	slotsdb "scheduler/appointment-service/internal/dbase/backend/slots"
 
 	"github.com/gorilla/mux"
 )
-
-type TokenToUserExchanger interface {
-	ExchangeToken(code string) (common.ID, error)
-}
 
 func parseTime(s string) (time.Time, error) {
 	return time.Parse(time.RFC3339, s)
@@ -38,9 +35,8 @@ func getTimeFromURL(key string, v url.Values) (time.Time, error) {
 
 // TODO add lock?
 // TODO prepare error, prepare QueryId
-func SlotsBusinessIdGetFunc(s *storage.Storage) http.HandlerFunc {
+func SlotsBusinessIdGetFunc(s *slotsdb.TimeSlotsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		vars := mux.Vars(r)
 		businessID := vars["business_id"]
@@ -91,28 +87,62 @@ func SlotsBusinessIdGetFunc(s *storage.Storage) http.HandlerFunc {
 	}
 }
 
+type AuthResult struct {
+	Business common.ID
+	Client   common.ID
+}
+
+type AddSlotsAuth interface {
+	Authorization(r *http.Request) (AuthResult, error)
+}
+
+type AddSlotsAuthFromUrl struct {
+}
+
+func (AddSlotsAuthFromUrl) Authorization(r *http.Request) (AuthResult, error) {
+	var result AuthResult
+	businessID, ok := GetUserID(r.Context())
+	if !ok {
+		return result, fmt.Errorf("businessId: %w", common.ErrNotFound)
+	}
+
+	clientID := r.URL.Query().Get("client_id")
+	if clientID == "" {
+		return result, fmt.Errorf("client_id: %w", common.ErrNotFound)
+	}
+
+	result.Business = businessID
+	result.Client = clientID
+	return result, nil
+}
+
+type AddSlotsAuthOneOffToken auth.OneOffTokenStorage
+
+func (a *AddSlotsAuthOneOffToken) Authorization(r *http.Request) (AuthResult, error) {
+	var result AuthResult
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		return result, fmt.Errorf("token: %w", common.ErrNotFound)
+	}
+
+	entry, err := (*auth.OneOffTokenStorage)(a).ExchangeToken(token)
+	if err != nil {
+		return result, err
+	}
+	result.Business = entry.BusinessID
+	result.Client = entry.ClientID
+	return result, err
+}
+
 // TODO Fix it, change swagger.Slot, prepare error, prepare QueryId
-func SlotsBusinessIdPostFunc(s *storage.Storage, te TokenToUserExchanger) http.HandlerFunc {
+func SlotsBusinessIdPostFunc(au AddSlotsAuth, s *slotsdb.TimeSlotsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-		businessID, ok := GetUserID(r.Context())
-		if !ok {
-			panic("businessId not found")
-		}
-
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			slog.WarnContext(r.Context(), "token not found")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		clientID, err := te.ExchangeToken(token)
+		authResult, err := au.Authorization(r)
 		if err != nil {
-			slog.WarnContext(r.Context(), "token exchange failed", "err", err)
+			slog.WarnContext(r.Context(), "[SlotsBusinessIdPost]", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
-			return
 		}
 
 		var jsonSlots []swagger.Slot
@@ -165,7 +195,7 @@ func SlotsBusinessIdPostFunc(s *storage.Storage, te TokenToUserExchanger) http.H
 
 		slog.InfoContext(r.Context(), fmt.Sprint(slots))
 
-		availableSlots, err := s.GetAvailableSlotsInRange(businessID, tpInterval)
+		availableSlots, err := s.GetAvailableSlotsInRange(authResult.Business, tpInterval)
 		if err != nil {
 			slog.ErrorContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -187,9 +217,9 @@ func SlotsBusinessIdPostFunc(s *storage.Storage, te TokenToUserExchanger) http.H
 			}
 		}
 
-		s.AddSlots(storage.AddSlotsData{
-			Business: businessID,
-			Client:   clientID,
+		s.AddSlots(slotsdb.AddSlotsData{
+			Business: authResult.Business,
+			Client:   authResult.Client,
 			Slots:    slots,
 		})
 

@@ -1,4 +1,4 @@
-package storage
+package bots
 
 import (
 	"scheduler/appointment-service/internal/dbase/test"

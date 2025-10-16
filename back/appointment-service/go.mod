@@ -5,6 +5,7 @@ go 1.23.0
 require (
 	github.com/MicahParks/jwkset v0.9.6
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/sessions v1.4.0
@@ -23,12 +24,14 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
