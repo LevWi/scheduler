@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	server "scheduler/appointment-service/api"
+	"scheduler/appointment-service/api"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/auth"
 
@@ -44,15 +44,16 @@ func main() {
 	//TODO move LifeTime to config?
 	userSessionStore := auth.NewUserSessionStore(sessionStore, auth.WithAuthStatusCheck(), auth.WithSessionLifeTime(time.Hour*24*5))
 
-	router := server.NewRouterBuilder(db, userSessionStore).
-		AddTimeSlotsHandlers().
-		AddBusinessRulesHandlers().
-		AddUserAccountHandlers().
-		AppendFileServerLogic(cfg.FrontPath).
-		AddOIDCHandlers(cfg.Auth.OAuthGoogleConfig).
-		Done()
+	api, err := api.NewAPI(cfg.Auth.OAuthGoogleConfig, userSessionStore, db)
+	if err != nil {
+		slog.Error("[NewAPI]", "err", err.Error())
+		log.Fatal(err)
+	}
 
-	err = http.ListenAndServe(cfg.Addr, router)
+	r := api.Router()
+	api.AppendFileServerLogic(cfg.FrontPath, r)
+
+	err = http.ListenAndServe(cfg.Addr, r)
 	if err != nil {
 		slog.Error("[http.ListenAndServe]", "err", err.Error())
 		log.Fatal(err)

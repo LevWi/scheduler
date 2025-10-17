@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"encoding/json"
@@ -35,9 +35,9 @@ func getTimeFromURL(key string, v url.Values) (time.Time, error) {
 
 // TODO add lock?
 // TODO prepare error, prepare QueryId
-func SlotsBusinessIdGetFunc(s *slotsdb.TimeSlotsStorage) http.HandlerFunc {
+func (a *api) SlotsBusinessIdGetFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		//w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		vars := mux.Vars(r)
 		businessID := vars["business_id"]
 		if businessID == "" {
@@ -59,7 +59,7 @@ func SlotsBusinessIdGetFunc(s *slotsdb.TimeSlotsStorage) http.HandlerFunc {
 			return
 		}
 
-		slots, err := s.GetAvailableSlotsInRange(businessID, common.Interval{Start: dateStart, End: dateEnd})
+		slots, err := a.storages.TimeSlots.GetAvailableSlotsInRange(businessID, common.Interval{Start: dateStart, End: dateEnd})
 		if err != nil {
 			slog.WarnContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -82,8 +82,6 @@ func SlotsBusinessIdGetFunc(s *slotsdb.TimeSlotsStorage) http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		//TODO http: superfluous response.WriteHeader call
-		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -135,7 +133,7 @@ func (a *AddSlotsAuthOneOffToken) Authorization(r *http.Request) (AuthResult, er
 }
 
 // TODO Fix it, change swagger.Slot, prepare error, prepare QueryId
-func SlotsBusinessIdPostFunc(au AddSlotsAuth, s *slotsdb.TimeSlotsStorage) http.HandlerFunc {
+func (a *api) SlotsBusinessIdPostFunc(au AddSlotsAuth) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -195,7 +193,7 @@ func SlotsBusinessIdPostFunc(au AddSlotsAuth, s *slotsdb.TimeSlotsStorage) http.
 
 		slog.InfoContext(r.Context(), fmt.Sprint(slots))
 
-		availableSlots, err := s.GetAvailableSlotsInRange(authResult.Business, tpInterval)
+		availableSlots, err := a.storages.TimeSlots.GetAvailableSlotsInRange(authResult.Business, tpInterval)
 		if err != nil {
 			slog.ErrorContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -217,7 +215,7 @@ func SlotsBusinessIdPostFunc(au AddSlotsAuth, s *slotsdb.TimeSlotsStorage) http.
 			}
 		}
 
-		s.AddSlots(slotsdb.AddSlotsData{
+		a.storages.TimeSlots.AddSlots(slotsdb.AddSlotsData{
 			Business: authResult.Business,
 			Client:   authResult.Client,
 			Slots:    slots,

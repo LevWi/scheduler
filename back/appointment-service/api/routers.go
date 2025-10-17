@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -10,12 +10,8 @@ import (
 	"scheduler/appointment-service/internal/auth"
 	"scheduler/appointment-service/internal/auth/oidc"
 	authdb "scheduler/appointment-service/internal/dbase/auth"
-	"scheduler/appointment-service/internal/dbase/backend/slots"
-	"scheduler/appointment-service/internal/dbase/bots"
 
 	"github.com/gorilla/mux"
-	"github.com/jmoiron/sqlx"
-	"golang.org/x/time/rate"
 )
 
 type Route struct {
@@ -79,170 +75,140 @@ func newUserSignIn(storage *authdb.AuthStorage, sesStore *auth.UserSessionStore,
 	}, nil
 }
 
-type RouterBuilder struct {
-	_          common.NoCopy
-	db         *sqlx.DB
-	sesStore   *auth.UserSessionStore
-	cookieAuth *CookieAuth
-
-	v *mux.Router
-}
-
-func NewRouterBuilder(db *sqlx.DB, sesStore *auth.UserSessionStore) *RouterBuilder {
-	var rb RouterBuilder
-	rb.v = mux.NewRouter().StrictSlash(true)
-
-	restrictionTable := common.NewLimitsTable[string](
-		//TODO need more complex solution
-		common.RequestLimitUpdateFunc(func(in *rate.Limiter) *rate.Limiter {
-			return rate.NewLimiter(rate.Every(time.Second*15), 1)
-		}))
-	userCheck := userCheckWrap{&authdb.AuthStorage{DB: db}, restrictionTable}
-	rb.cookieAuth = &CookieAuth{sesStore, userCheck}
-
-	rb.db = db
-	rb.sesStore = sesStore
-	return &rb
-}
-
 // TODO need more logs
-func (rb *RouterBuilder) AddUserAccountHandlers() *RouterBuilder {
-	bs := bots.BotsStorage{DB: rb.db}
-	as := authdb.AuthStorage{DB: rb.db}
-	rb.addRoutes(
+func (a *api) addUserAccountHandlers(r *mux.Router) {
+	addRoutes(
+		r,
 		Route{
 			"Logout",
 			"POST",
 			"/logout",
-			AuthHandler(rb.cookieAuth, LogoutHandler(rb.sesStore), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, LogoutHandler(a.userSessionsStore), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DeleteUser",
 			"DELETE",
 			"/user",
-			AuthHandler(rb.cookieAuth, DeleteUserHandler(rb.sesStore, as.DeleteUserWithCheck), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth,
+				DeleteUserHandler(a.userSessionsStore, a.storages.Auth.DeleteUserWithCheck),
+				http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"UserBotAdd",
 			"POST",
 			"/user/bots",
-			AuthHandler(rb.cookieAuth, AddUserBotHandler(&bs), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, AddUserBotHandler(a.storages.Bots), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"UserBotDel",
 			"DELETE",
 			"/user/bots/{bot_id}",
-			AuthHandler(rb.cookieAuth, DeleteUserBotHandler(&bs), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, DeleteUserBotHandler(a.storages.Bots), http.HandlerFunc(LoginRequired)),
 		})
-
-	return rb
 }
 
-func (rb *RouterBuilder) addRoutes(routes ...Route) {
-	for _, route := range routes {
-		var handler http.Handler
-		handler = Logger(route.HandlerFunc, route.Name)
-		handler = PassRequestIdToCtx(handler)
+func (a *api) Router() *mux.Router {
+	r := mux.NewRouter().StrictSlash(true)
 
-		rb.v.
-			Methods(route.Method).
-			Path(route.Pattern).
-			Name(route.Name).
-			Handler(handler)
-	}
+	a.addTimeSlotsHandlers(r)
+	a.addBusinessRulesHandlers(r)
+	a.addUserAccountHandlers(r)
+	a.addOIDCHandlers(r)
+
+	r.Use(PassRequestIdToCtx)
+	return r
 }
 
-func (rb *RouterBuilder) AddOIDCHandlers(oauthCfgPath string) *RouterBuilder {
-	as := authdb.AuthStorage{DB: rb.db}
-	oidcUserSignIn, err := newUserSignIn(&as, rb.sesStore, oauthCfgPath)
-	if err != nil {
-		slog.Warn("[NewRouter]", "err", err.Error())
-		panic(err)
-	}
-	rb.addRoutes(
+func (a *api) addOIDCHandlers(r *mux.Router) {
+	addRoutes(r,
 		Route{
 			"OAuth2Redirect",
 			"GET",
 			"/oauth_login",
-			oidc.OAuth2HTTPRedirectHandler(oidcUserSignIn),
+			oidc.OAuth2HTTPRedirectHandler(a.userSignIn),
 		},
 		Route{
 			"OAuth2UserBack",
 			"GET",
 			"/callback", //"TODO fix it /oauth_callback"
-			oidc.OAuth2HTTPUserBackHandler(oidcUserSignIn, nil),
+			oidc.OAuth2HTTPUserBackHandler(a.userSignIn, nil),
 		})
-	return rb
 }
 
-func (rb *RouterBuilder) AddTimeSlotsHandlers() *RouterBuilder {
-	ts := &slots.TimeSlotsStorage{DB: rb.db}
-	oneOffAuth := AddSlotsAuthOneOffToken(authdb.OneOffTokenStorage{DB: rb.db})
-	bs := auth.BotTokenStorage{BotsStorage: &bots.BotsStorage{DB: rb.db}}
-	rb.addRoutes(
+func (a *api) addTimeSlotsHandlers(r *mux.Router) {
+	oneOffAuth := (*AddSlotsAuthOneOffToken)(a.storages.Auth)
+	bs := auth.BotTokenStorage{BotsStorage: a.storages.Bots}
+	addRoutes(
+		r,
 		Route{
 			"SlotsBusinessIdGet",
 			"GET",
 			"/slots/{business_id}",
-			SlotsBusinessIdGetFunc(ts),
+			a.SlotsBusinessIdGetFunc(),
 		},
 		Route{
 			"SlotsBusinessIdPostFromBot",
 			"POST",
 			"/slots/once",
-			SlotsBusinessIdPostFunc(&oneOffAuth, ts),
+			a.SlotsBusinessIdPostFunc(oneOffAuth),
 		},
 		Route{
 			"SlotsBusinessIdPostFromBot",
 			"POST",
 			"/slots/off",
 			//SlotsBusinessIdPostFunc(&oneOffAuth, ts),
-			AuthHandler(botAuthMethod(&bs), SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}, ts), http.HandlerFunc(LoginRequired)),
+			AuthHandler(botAuthMethod(&bs), a.SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots",
-			AuthHandler(rb.cookieAuth, SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}, ts), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, a.SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}), http.HandlerFunc(LoginRequired)),
 		})
-	return rb
 }
 
-func (rb *RouterBuilder) AddBusinessRulesHandlers() *RouterBuilder {
-	ruleStorage := rruleStorage{&slots.TimeSlotsStorage{DB: rb.db}}
-	rb.addRoutes(
+func (a *api) addBusinessRulesHandlers(r *mux.Router) {
+	ruleStorage := rruleStorage{a.storages.TimeSlots}
+	addRoutes(
+		r,
 		Route{
 			"AddBusinessRulePost",
 			"POST",
 			"/rrules",
-			AuthHandler(rb.cookieAuth, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"GetBusinessRule",
 			"GET",
 			"/rrules",
-			AuthHandler(rb.cookieAuth, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DelBusinessRule",
 			"DELETE",
 			"/rrules/{id}",
-			AuthHandler(rb.cookieAuth, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
 		})
-	return rb
 }
 
-func (rb *RouterBuilder) AppendFileServerLogic(dir string) *RouterBuilder {
-	rb.v.Methods("GET").PathPrefix("/front/").Name("FileServer").
+// TODO
+// Deprecated: Move from service logic
+func (a *api) AppendFileServerLogic(dir string, r *mux.Router) {
+	r.Methods("GET").PathPrefix("/front/").Name("FileServer").
 		Handler(http.StripPrefix("/front/", http.FileServer(http.Dir(dir))))
-	return rb
-}
-
-func (rb *RouterBuilder) Done() *mux.Router {
-	return rb.v
 }
 
 func LoginRequired(w http.ResponseWriter, r *http.Request) {
 	slog.WarnContext(r.Context(), "[LoginRequired]", "RemoteAddr", r.RemoteAddr)
 	http.Error(w, "Please login first", http.StatusNetworkAuthenticationRequired)
+}
+
+func addRoutes(r *mux.Router, routes ...Route) {
+	for _, route := range routes {
+		handler := Logger(route.HandlerFunc, route.Name)
+		r.Methods(route.Method).
+			Path(route.Pattern).
+			Name(route.Name).
+			Handler(handler)
+	}
 }
