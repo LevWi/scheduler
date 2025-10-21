@@ -147,7 +147,7 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 			a.SlotsBusinessIdGetFunc(),
 		},
 		Route{
-			"SlotsBusinessIdPostFromBot",
+			"SlotsBusinessIdPostOneOff",
 			"POST",
 			"/slots/once",
 			a.SlotsBusinessIdPostFunc(oneOffAuth),
@@ -155,7 +155,7 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 		Route{
 			"SlotsBusinessIdPostFromBot",
 			"POST",
-			"/slots/off",
+			"/slots/bt",
 			//SlotsBusinessIdPostFunc(&oneOffAuth, ts),
 			AuthHandler(botAuthMethod(&bs), a.SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}), http.HandlerFunc(LoginRequired)),
 		},
