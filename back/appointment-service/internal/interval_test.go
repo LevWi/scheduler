@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInterval(t *testing.T) {
@@ -104,6 +106,16 @@ func TestInterval(t *testing.T) {
 	if len(result) != 2 || result[0] != expected2[0] || result[1] != expected2[1] {
 		t.Fatalf("result should be %v but got %v", expected2, result)
 	}
+}
+
+func TestIntervalDuration(t *testing.T) {
+	start := time.Now()
+	delta := time.Second * 5
+	i := Interval{Start: start, End: start.Add(delta)}
+	assert.Equal(t, i.Duration(), delta)
+	assert.Equal(t, Interval{}.Duration(), time.Duration(0))
+	assert.Equal(t, Interval{End: start, Start: start.Add(delta)}.Duration(), time.Duration(0))
+	assert.Equal(t, Interval{Start: start, End: start}.Duration(), time.Duration(0))
 }
 
 func TestIntervalSlices(t *testing.T) {

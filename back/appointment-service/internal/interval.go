@@ -58,6 +58,15 @@ func (i Interval) Subtract(other Interval) Intervals {
 	return Intervals{{Start: other.End, End: i.End}}
 }
 
+func (i Interval) Duration() time.Duration {
+	var out time.Duration
+	if !i.IsValid() {
+		return out
+	}
+
+	return i.End.Sub(i.Start)
+}
+
 func (i Interval) Intersection(other Interval) Interval {
 	out := other
 	if i.Start.After(other.Start) {

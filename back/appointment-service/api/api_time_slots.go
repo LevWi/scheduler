@@ -46,13 +46,14 @@ func (a *api) SlotsBusinessIdGetFunc() http.HandlerFunc {
 			return
 		}
 
-		dateStart, err := getTimeFromURL("date_start", r.URL.Query())
+		query := r.URL.Query()
+		dateStart, err := getTimeFromURL("date_start", query)
 		if err != nil {
 			slog.WarnContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		dateEnd, err := getTimeFromURL("date_end", r.URL.Query())
+		dateEnd, err := getTimeFromURL("date_end", query)
 		if err != nil {
 			slog.WarnContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusBadRequest)
@@ -133,6 +134,7 @@ func (a *AddSlotsAuthOneOffToken) Authorization(r *http.Request) (AuthResult, er
 }
 
 // TODO Fix it, change swagger.Slot, prepare error, prepare QueryId
+// TODO Bug: May be race condition between GetAvailableSlotsInRange and AddSlots
 func (a *api) SlotsBusinessIdPostFunc(au AddSlotsAuth) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
