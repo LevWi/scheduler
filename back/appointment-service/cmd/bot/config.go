@@ -3,16 +3,14 @@ package main
 import (
 	"errors"
 	"log/slog"
+	"scheduler/appointment-service/internal/bot"
 	"scheduler/appointment-service/internal/config"
 )
 
 type BotConfig struct {
-	BotAPIConnection string     `cfg:"bot_api_connection"`
-	LogLevel         slog.Level `cfg:"log_level"`
-	SchedulerAPI     struct {
-		ClientId string `cfg:"client_id"`
-		Token    string `cfg:"token"`
-	} `cfg:"scheduler"`
+	BotAPIConnection string                  `cfg:"bot_api_connection"`
+	LogLevel         slog.Level              `cfg:"log_level"`
+	SchedulerAPI     bot.SchedulerConnection `cfg:"scheduler"`
 	//TODO business_id?
 }
 

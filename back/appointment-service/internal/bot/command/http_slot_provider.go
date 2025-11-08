@@ -15,7 +15,8 @@ type HttpSlotsProvider struct {
 	baseURL string
 }
 
-func (p *HttpSlotsProvider) AvailableSlotsInRange(ctx context.Context, business_id common.ID, interval common.Interval) (common.Intervals, error) {
+// TODO make function swagger.Slot -> common.Slot
+func (p *HttpSlotsProvider) AvailableSlotsInRange(ctx context.Context, business_id common.ID, interval common.Interval) ([]common.Slot, error) {
 	u, err := url.JoinPath(p.baseURL, "slots", business_id)
 	if err != nil {
 		return nil, err
@@ -36,13 +37,9 @@ func (p *HttpSlotsProvider) AvailableSlotsInRange(ctx context.Context, business_
 		return nil, err
 	}
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		break
-	case http.StatusBadRequest:
-		return nil, fmt.Errorf("http: %w (%s)", common.ErrInvalidArgument, resp.Status)
-	default:
-		return nil, fmt.Errorf("http: unexpected response (%s)", resp.Status)
+	err = checkStatusCode(resp)
+	if err != nil {
+		return nil, err
 	}
 
 	//TODO print request id in log
@@ -52,11 +49,11 @@ func (p *HttpSlotsProvider) AvailableSlotsInRange(ctx context.Context, business_
 		return nil, fmt.Errorf("http: unexpected response (%s)", resp.Status)
 	}
 
-	out := make(common.Intervals, 0, len(slots.Slots))
+	out := make([]common.Slot, 0, len(slots.Slots))
 	for _, slot := range slots.Slots {
-		var tmp common.Interval
+		var tmp common.Slot
 		tmp.Start = slot.TpStart
-		tmp.End = tmp.Start.Add(time.Minute * time.Duration(slot.Len))
+		tmp.Dur = time.Minute * time.Duration(slot.Len)
 		out = append(out, tmp)
 	}
 	return out, nil

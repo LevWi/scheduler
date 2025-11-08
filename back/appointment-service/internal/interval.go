@@ -239,3 +239,7 @@ func (intervals Intervals) PassedIntervals(exclusions Intervals) Intervals {
 	}
 	return out
 }
+
+func (i Interval) ToSlot() Slot {
+	return Slot{Start: i.Start, Dur: i.End.Sub(i.Start)}
+}

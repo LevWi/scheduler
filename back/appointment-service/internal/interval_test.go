@@ -108,6 +108,13 @@ func TestInterval(t *testing.T) {
 	}
 }
 
+func TestIntervalToSlot(t *testing.T) {
+	start := time.Now()
+	slot := Interval{Start: start, End: start.Add(time.Minute)}.ToSlot()
+
+	assert.Equal(t, Slot{Start: start, Dur: time.Minute}, slot)
+}
+
 func TestIntervalDuration(t *testing.T) {
 	start := time.Now()
 	delta := time.Second * 5
