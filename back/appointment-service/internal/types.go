@@ -3,7 +3,7 @@ package common
 type ID = string
 
 type BusySlot struct {
-	Client ID
+	Customer ID
 	Interval
 }
 
