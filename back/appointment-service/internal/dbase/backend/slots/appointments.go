@@ -13,18 +13,20 @@ type TimeSlotsStorage struct {
 }
 
 type dbBusySlot struct {
-	Client    string `db:"client_id"`
+	Customer  string `db:"client_id"`
 	Business  string `db:"business_id"` // TODO use integer
 	DateStart int64  `db:"date_start"`
 	DateEnd   int64  `db:"date_end"`
 }
 
 func (slot dbBusySlot) ToSlot() common.BusySlot {
-	return common.BusySlot{Client: slot.Client,
+	return common.BusySlot{
+		Customer: slot.Customer,
 		Interval: common.Interval{
 			Start: time.Unix(slot.DateStart, 0),
 			End:   time.Unix(slot.DateEnd, 0),
-		}}
+		},
+	}
 }
 
 type DBRule = string
@@ -114,15 +116,15 @@ func (db *TimeSlotsStorage) GetBusySlotsInRange(business_id common.ID, between c
 	return slotsOut, nil
 }
 
-func (db *TimeSlotsStorage) DeleteSlots(business_id common.ID, client_id common.ID, start time.Time, end time.Time) error {
+func (db *TimeSlotsStorage) DeleteSlots(business_id common.ID, customerID common.ID, start time.Time, end time.Time) error {
 	_, err := db.Exec("DELETE FROM appointments WHERE business_id = $1 AND client_id = $2 AND date_start BETWEEN $3 AND $4",
-		business_id, client_id, start.Unix(), end.Unix())
+		business_id, customerID, start.Unix(), end.Unix())
 	return err
 }
 
 type AddSlotsData struct {
 	Business common.ID
-	Client   common.ID
+	Customer common.ID
 	Slots    common.Intervals
 }
 
@@ -130,8 +132,13 @@ type AddSlotsData struct {
 func (db *TimeSlotsStorage) AddSlots(in AddSlotsData) error {
 	dbSlots := make([]dbBusySlot, 0, len(in.Slots))
 	for _, slot := range in.Slots {
-		dbSlots = append(dbSlots, dbBusySlot{Client: in.Client, Business: in.Business, DateStart: slot.Start.Unix(), DateEnd: slot.End.Unix()})
+		dbSlots = append(dbSlots, dbBusySlot{
+			Customer:  in.Customer,
+			Business:  in.Business,
+			DateStart: slot.Start.Unix(),
+			DateEnd:   slot.End.Unix(),
+		})
 	}
-	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_start, client_id, date_end) VALUES (:business_id, :date_start, :client_id, :date_end)", dbSlots)
+	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_start, client_id, date_end) VALUES (:business, :date_start, :customer, :date_end)", dbSlots)
 	return err
 }
