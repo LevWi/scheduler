@@ -8,8 +8,8 @@
  */
 package swagger
 
+// TODO rename to CustomerId
 type SlotsRequest struct {
-
 	ClientId string `json:"client_id,omitempty"`
 
 	Slots []Slot `json:"slots,omitempty"`

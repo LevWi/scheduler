@@ -19,26 +19,26 @@ type OneOffTokenStorage struct {
 	*sqlx.DB
 }
 
-type ClientID = common.ID
+type CustomerID = common.ID
 type BusinessID = common.ID
 
 type TokenEntry struct {
 	Token      string `db:"token"`
 	BusinessID string `db:"business_id"`
-	ClientID   string `db:"client_id"`
+	CustomerID string `db:"customer_id"`
 	ExpiresAt  int64  `db:"expires_at"`
 	IsUsed     bool   `db:"is_used"`
 }
 
-func (db *OneOffTokenStorage) AddUserToken(businessID BusinessID, clientID ClientID,
+func (db *OneOffTokenStorage) AddUserToken(businessID BusinessID, customerID CustomerID,
 	token string, expiresAt time.Time) error {
 	_, err := db.Exec(
-		`INSERT INTO user_tokens (business_id, client_id, token, expires_at, is_used)
+		`INSERT INTO user_tokens (business_id, customer_id, token, expires_at, is_used)
 			VALUES ($1, $2, $3, $4, FALSE)
-		ON CONFLICT(business_id, client_id) DO UPDATE SET
+		ON CONFLICT(business_id, customer_id) DO UPDATE SET
 			token = $3,
 			expires_at = $4,
-			is_used = FALSE`, businessID, clientID, token, expiresAt.Unix())
+			is_used = FALSE`, businessID, customerID, token, expiresAt.Unix())
 
 	return dbase.DbError(err)
 }
@@ -69,7 +69,7 @@ func (db *OneOffTokenStorage) ExchangeToken(token string) (*TokenEntry, error) {
 	if rows == 0 {
 		//TODO add tests
 		err = tx.Get(&dbToken,
-			`SELECT business_id, client_id, is_used, expires_at
+			`SELECT business_id, customer_id, is_used, expires_at
 			FROM user_tokens
 			WHERE token = $1`, token)
 		if err != nil {
@@ -87,7 +87,7 @@ func (db *OneOffTokenStorage) ExchangeToken(token string) (*TokenEntry, error) {
 	}
 
 	err = tx.Get(&dbToken,
-		`SELECT business_id, client_id, is_used, expires_at FROM user_tokens WHERE token = $1`, token)
+		`SELECT business_id, customer_id, is_used, expires_at FROM user_tokens WHERE token = $1`, token)
 	if err != nil {
 		return nil, dbase.DbError(err)
 	}
