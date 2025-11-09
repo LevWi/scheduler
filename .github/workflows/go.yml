@@ -23,7 +23,7 @@ jobs:
 
     - name: Build
       run: go build -v ./...
-      working-directory: back/appointment-service
+      working-directory: back/appointment-service/cmd/service
 
     - name: Test
       run: go test -v ./...
