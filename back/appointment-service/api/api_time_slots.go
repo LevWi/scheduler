@@ -88,7 +88,7 @@ func (a *api) SlotsBusinessIdGetFunc() http.HandlerFunc {
 
 type AuthResult struct {
 	Business common.ID
-	Client   common.ID
+	Customer common.ID
 }
 
 type AddSlotsAuth interface {
@@ -105,13 +105,13 @@ func (AddSlotsAuthFromUrl) Authorization(r *http.Request) (AuthResult, error) {
 		return result, fmt.Errorf("businessId: %w", common.ErrNotFound)
 	}
 
-	clientID := r.URL.Query().Get("client_id")
-	if clientID == "" {
-		return result, fmt.Errorf("client_id: %w", common.ErrNotFound)
+	customerID := r.URL.Query().Get("customer_id")
+	if customerID == "" {
+		return result, fmt.Errorf("customer_id: %w", common.ErrNotFound)
 	}
 
 	result.Business = businessID
-	result.Client = clientID
+	result.Customer = customerID
 	return result, nil
 }
 
@@ -129,7 +129,7 @@ func (a *AddSlotsAuthOneOffToken) Authorization(r *http.Request) (AuthResult, er
 		return result, err
 	}
 	result.Business = entry.BusinessID
-	result.Client = entry.ClientID
+	result.Customer = entry.CustomerID
 	return result, err
 }
 
@@ -219,7 +219,7 @@ func (a *api) SlotsBusinessIdPostFunc(au AddSlotsAuth) http.HandlerFunc {
 
 		a.storages.TimeSlots.AddSlots(slotsdb.AddSlotsData{
 			Business: authResult.Business,
-			Client:   authResult.Client,
+			Customer: authResult.Customer,
 			Slots:    slots,
 		})
 

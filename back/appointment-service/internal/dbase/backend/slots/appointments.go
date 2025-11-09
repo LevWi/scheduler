@@ -13,7 +13,7 @@ type TimeSlotsStorage struct {
 }
 
 type dbBusySlot struct {
-	Customer  string `db:"client_id"`
+	Customer  string `db:"customer_id"`
 	Business  string `db:"business_id"` // TODO use integer
 	DateStart int64  `db:"date_start"`
 	DateEnd   int64  `db:"date_end"`
@@ -117,7 +117,7 @@ func (db *TimeSlotsStorage) GetBusySlotsInRange(business_id common.ID, between c
 }
 
 func (db *TimeSlotsStorage) DeleteSlots(business_id common.ID, customerID common.ID, start time.Time, end time.Time) error {
-	_, err := db.Exec("DELETE FROM appointments WHERE business_id = $1 AND client_id = $2 AND date_start BETWEEN $3 AND $4",
+	_, err := db.Exec("DELETE FROM appointments WHERE business_id = $1 AND customer_id = $2 AND date_start BETWEEN $3 AND $4",
 		business_id, customerID, start.Unix(), end.Unix())
 	return err
 }
@@ -139,6 +139,6 @@ func (db *TimeSlotsStorage) AddSlots(in AddSlotsData) error {
 			DateEnd:   slot.End.Unix(),
 		})
 	}
-	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_start, client_id, date_end) VALUES (:business, :date_start, :customer, :date_end)", dbSlots)
+	_, err := db.NamedExec("INSERT INTO appointments (business_id, date_start, customer_id, date_end) VALUES (:business_id, :date_start, :customer_id, :date_end)", dbSlots)
 	return err
 }

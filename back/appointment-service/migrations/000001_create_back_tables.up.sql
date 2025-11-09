@@ -17,7 +17,7 @@ CREATE TABLE appointments (
 	date_start	  INTEGER NOT NULL,
 	date_end	  INTEGER NOT NULL,
 	business_id   TEXT NOT NULL,
-	client_id	  TEXT NOT NULL,
+	customer_id	  TEXT NOT NULL,
 	UNIQUE (business_id, date_start)
 );
 
@@ -41,8 +41,8 @@ CREATE TABLE user_bots (
 CREATE TABLE user_tokens (
 	token      	TEXT PRIMARY KEY,
 	business_id TEXT NOT NULL,
-	client_id  	TEXT NOT NULL,
+	customer_id  	TEXT NOT NULL,
 	expires_at  INTEGER NOT NULL,
 	is_used     BOOLEAN NOT NULL DEFAULT FALSE,
-	UNIQUE (business_id, client_id)
+	UNIQUE (business_id, customer_id)
 );

@@ -15,23 +15,23 @@ func TestUserToken(t *testing.T) {
 	defer storage.Close()
 
 	businessID := "user1"
-	clientID := "client1"
+	customerID := "customer1"
 	token := "token1"
 	expiresAt := time.Now().Add(1 * time.Hour)
 
 	// Add a new token
-	err := storage.AddUserToken(businessID, clientID, token, expiresAt)
+	err := storage.AddUserToken(businessID, customerID, token, expiresAt)
 	assert.NoError(t, err)
 
 	// Try to add the same token again, should update
-	err = storage.AddUserToken(businessID, clientID, "new-token", expiresAt)
+	err = storage.AddUserToken(businessID, customerID, "new-token", expiresAt)
 	assert.NoError(t, err)
 
 	// Exchange the token
 	expected, err := storage.ExchangeToken("new-token")
 	assert.NoError(t, err)
 	assert.Equal(t, businessID, expected.BusinessID)
-	assert.Equal(t, clientID, expected.ClientID)
+	assert.Equal(t, customerID, expected.CustomerID)
 
 	// Try to exchange the same token again
 	_, err = storage.ExchangeToken("new-token")
@@ -44,7 +44,7 @@ func TestUserToken(t *testing.T) {
 	// Test expired token
 	expiredToken := "expired-token"
 	expiredExpiresAt := time.Now().Add(-1 * time.Hour)
-	err = storage.AddUserToken("user2", "client2", expiredToken, expiredExpiresAt)
+	err = storage.AddUserToken("user2", "customer2", expiredToken, expiredExpiresAt)
 	assert.NoError(t, err)
 
 	_, err = storage.ExchangeToken(expiredToken)
