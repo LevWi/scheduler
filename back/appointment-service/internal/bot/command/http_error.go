@@ -11,8 +11,10 @@ func checkStatusCode(resp *http.Response) error {
 	case http.StatusOK:
 		return nil
 	case http.StatusBadRequest:
-		return fmt.Errorf("http: %w (%s)", common.ErrInvalidArgument, resp.Status)
+		return fmt.Errorf("http response: %w (%s)", common.ErrInvalidArgument, resp.Status)
+	case http.StatusUnauthorized:
+		return fmt.Errorf("http response: %w (%s)", common.ErrUnauthorized, resp.Status)
 	default:
-		return fmt.Errorf("http: unexpected response (%s)", resp.Status)
+		return fmt.Errorf("http response: unexpected response (%s)", resp.Status)
 	}
 }
