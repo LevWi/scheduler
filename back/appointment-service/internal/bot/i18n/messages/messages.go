@@ -23,7 +23,13 @@ var Cancel = &i18n.Message{
 	One: "Cancel",
 }
 
-type MessageMap map[string]*i18n.Message
+var Done = &i18n.Message{
+	ID:  "Done",
+	One: "Done",
+}
+
+type MessageConstant = i18n.Message
+type MessageMap map[string]*MessageConstant
 
 func LocalizedMessageMap(l *i18n.Localizer, ms ...*i18n.Message) (MessageMap, error) {
 	out := make(MessageMap, len(ms))
