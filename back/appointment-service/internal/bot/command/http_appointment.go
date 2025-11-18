@@ -14,7 +14,7 @@ import (
 )
 
 type Appointment struct {
-	Connection bot.SchedulerConnection
+	Connection *bot.SchedulerConnection
 }
 
 func (a *Appointment) AddSlots(ctx context.Context, customer common.ID, slots []common.Slot) error {
