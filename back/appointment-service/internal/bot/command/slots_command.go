@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
@@ -17,13 +18,13 @@ type ChatOutput interface {
 
 type LabeledSlot struct {
 	ID int
-	common.Interval
+	common.Slot
 }
 
-func ToLabeledSlot(in common.Intervals) []LabeledSlot {
-	ls := make([]LabeledSlot, len(in))
-	for i, interval := range in {
-		ls[i] = LabeledSlot{ID: i, Interval: interval}
+func ToLabeledSlot(slots []common.Slot) []LabeledSlot {
+	ls := make([]LabeledSlot, len(slots))
+	for i, s := range slots {
+		ls[i] = LabeledSlot{ID: i, Slot: s}
 	}
 	return ls
 }
@@ -48,19 +49,28 @@ func CommandMap(l *i18n.Localizer) (messages.MessageMap, error) {
 		messages.Done)
 }
 
-type SlotsCommandStMachine struct {
-	availableSlots []LabeledSlot
-
-	mmp      MessageMapProvider
-	chat     ChatOutput
-	commands struct {
-		WeekSlots   *WeekSlots
-		Appointment *Appointment
-	}
+type Appointment interface {
+	AddSlots(ctx context.Context, customer common.ID, slots []common.Slot) error
 }
 
-func (sm *SlotsCommandStMachine) Process(r *Request) error {
-	m, err := sm.mmp.Get()
+type commands struct {
+	WeekSlots   *WeekSlots
+	Appointment Appointment
+}
+
+type slotsSmDeps struct {
+	MP       MessageMapProvider
+	Chat     ChatOutput
+	Commands *commands
+}
+
+type SlotsCommandSMachine struct {
+	availableSlots []LabeledSlot
+	deps           *slotsSmDeps
+}
+
+func (sm *SlotsCommandSMachine) Process(r *Request) error {
+	m, err := sm.deps.MP.Get()
 	if err != nil {
 		return err
 	}
@@ -72,23 +82,21 @@ func (sm *SlotsCommandStMachine) Process(r *Request) error {
 
 	//TODO Need handle "Cancel" first
 	if sm.availableSlots == nil {
-		var slots common.Intervals
+		var slots []common.Slot
 		switch c {
 		case messages.NextWeek:
-			slots, err = sm.commands.WeekSlots.NextWeek(r.Ctx, r.Now)
+			slots, err = sm.deps.Commands.WeekSlots.NextWeek(r.Ctx, r.Now)
 		case messages.ThisWeek:
-			slots, err = sm.commands.WeekSlots.ThisWeek(r.Ctx, r.Now)
-		case messages.Cancel:
-			//TODO
+			slots, err = sm.deps.Commands.WeekSlots.ThisWeek(r.Ctx, r.Now)
 		default:
-			err = common.ErrInvalidArgument
+			err = fmt.Errorf("%w: unexpected message text ID %s (%s)", common.ErrInvalidArgument, c.ID, r.Text)
 		}
 
 		if err != nil {
 			return err
 		}
 		sm.availableSlots = ToLabeledSlot(slots)
-		return sm.chat.PrintSlots(r, sm.availableSlots)
+		return sm.deps.Chat.PrintSlots(r, sm.availableSlots)
 	} else {
 		if r.Text != "" {
 			return fmt.Errorf("%w: input text should be empty", common.ErrInvalidArgument)
@@ -116,7 +124,7 @@ func (sm *SlotsCommandStMachine) Process(r *Request) error {
 				}
 			}
 			sm.availableSlots = tmpArray
-			return sm.chat.PrintSlots(r, sm.availableSlots)
+			return sm.deps.Chat.PrintSlots(r, sm.availableSlots)
 		case ChoiceTypeSlots:
 			//TODO need logic for multiple slot choices
 			if len(r.Choices.IDs) != 1 {
@@ -126,21 +134,39 @@ func (sm *SlotsCommandStMachine) Process(r *Request) error {
 			tmpPrint := make([]LabeledSlot, len(r.Choices.IDs))
 			for _, slot := range sm.availableSlots {
 				if slot.ID == r.Choices.IDs[0] {
-					tmpArray = append(tmpArray, slot.Interval.ToSlot())
+					tmpArray = append(tmpArray, slot.Slot)
 					tmpPrint = append(tmpPrint, slot)
 				}
 			}
 
-			err = sm.commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
+			err = sm.deps.Commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
 			if err != nil {
 				return err
 			}
 
-			return sm.chat.ConfirmAppointment(r, tmpPrint)
+			return sm.deps.Chat.ConfirmAppointment(r, tmpPrint)
 		case ChoiceTypeNone:
 			return fmt.Errorf("%w: ChoiceType is not set", common.ErrInvalidArgument)
 		default:
 			return fmt.Errorf("%w: unexpected ChoiceType", common.ErrInternal)
 		}
 	}
+}
+
+func (sm *SlotsCommandSMachine) Cancel() {
+	sm.availableSlots = nil
+}
+
+func NewSlotsCommandStMachine(mmp MessageMapProvider, chat ChatOutput, weekSlots *WeekSlots, appointment Appointment) *SlotsCommandSMachine {
+	sm := &SlotsCommandSMachine{
+		deps: &slotsSmDeps{
+			MP:   mmp,
+			Chat: chat,
+			Commands: &commands{
+				WeekSlots:   weekSlots,
+				Appointment: appointment,
+			},
+		},
+	}
+	return sm
 }

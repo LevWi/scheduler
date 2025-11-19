@@ -13,11 +13,11 @@ import (
 	"time"
 )
 
-type Appointment struct {
+type HttpAppointment struct {
 	Connection *bot.SchedulerConnection
 }
 
-func (a *Appointment) AddSlots(ctx context.Context, customer common.ID, slots []common.Slot) error {
+func (a *HttpAppointment) AddSlots(ctx context.Context, customer common.ID, slots []common.Slot) error {
 	u, err := url.JoinPath(a.Connection.URL, "slots/bt")
 	if err != nil {
 		return err

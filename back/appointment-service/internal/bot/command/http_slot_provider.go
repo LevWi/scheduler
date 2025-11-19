@@ -12,12 +12,13 @@ import (
 )
 
 type HttpSlotsProvider struct {
-	baseURL string
+	baseURL    string
+	businessID common.ID
 }
 
 // TODO make function swagger.Slot -> common.Slot
-func (p *HttpSlotsProvider) AvailableSlotsInRange(ctx context.Context, business_id common.ID, interval common.Interval) ([]common.Slot, error) {
-	u, err := url.JoinPath(p.baseURL, "slots", business_id)
+func (p *HttpSlotsProvider) AvailableSlotsInRange(ctx context.Context, interval common.Interval) ([]common.Slot, error) {
+	u, err := url.JoinPath(p.baseURL, "slots", p.businessID)
 	if err != nil {
 		return nil, err
 	}

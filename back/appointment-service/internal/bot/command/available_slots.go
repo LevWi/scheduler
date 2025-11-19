@@ -7,35 +7,33 @@ import (
 )
 
 type SlotsProvider interface {
-	AvailableSlotsInRange(ctx context.Context, business_id common.ID, interval common.Interval) (common.Intervals, error)
+	AvailableSlotsInRange(ctx context.Context, interval common.Interval) ([]common.Slot, error)
 }
 
 type WeekSlots struct {
-	businessID common.ID
-	storage    SlotsProvider
+	storage SlotsProvider
 }
 
-func NewWeekSlots(businessID common.ID, storage SlotsProvider) *WeekSlots {
+func NewWeekSlots(storage SlotsProvider) *WeekSlots {
 	return &WeekSlots{
-		businessID: businessID,
-		storage:    storage,
+		storage: storage,
 	}
 }
 
-func (ws *WeekSlots) ThisWeek(ctx context.Context, now time.Time) (common.Intervals, error) {
+func (ws *WeekSlots) ThisWeek(ctx context.Context, now time.Time) ([]common.Slot, error) {
 	interval := common.Interval{
 		Start: now,
 		End:   common.NextMonday(now),
 	}
 
-	return ws.storage.AvailableSlotsInRange(ctx, ws.businessID, interval)
+	return ws.storage.AvailableSlotsInRange(ctx, interval)
 }
 
-func (ws *WeekSlots) NextWeek(ctx context.Context, now time.Time) (common.Intervals, error) {
+func (ws *WeekSlots) NextWeek(ctx context.Context, now time.Time) ([]common.Slot, error) {
 	interval := common.Interval{
 		Start: common.NextMonday(now),
 	}
 	interval.End = common.NextMonday(interval.Start)
 
-	return ws.storage.AvailableSlotsInRange(ctx, ws.businessID, interval)
+	return ws.storage.AvailableSlotsInRange(ctx, interval)
 }
