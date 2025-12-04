@@ -12,6 +12,7 @@ import (
 )
 
 type ChatSlotsOutput interface {
+	ChatOutput
 	PrintSlots(c *ChatContext, m []LabeledSlot) error
 	ConfirmAppointment(c *ChatContext, m []LabeledSlot) error
 }
@@ -76,6 +77,21 @@ const (
 	SlotSelectionResultContinue
 	SlotSelectionResultDone
 )
+
+// TODO write here or in MainMenu?
+func (sm *SlotSelectionCommand) ShowRangesMenu(c *ChatContext) error {
+	l, err := sm.deps.LP.Localizer()
+	if err != nil {
+		return err
+	}
+
+	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek, messages.Cancel}
+	localized, err := messages.LocalizeMessages(l, options)
+	if err != nil {
+		return err
+	}
+	return sm.deps.Chat.ShowMenu(c, localized)
+}
 
 func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
 	if sm.availableSlots == nil {

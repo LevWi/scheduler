@@ -28,6 +28,11 @@ var Done = &i18n.Message{
 	One: "Done",
 }
 
+var BookSlot = &i18n.Message{
+	ID:  "BookSlot",
+	One: "Book a slot",
+}
+
 var WrongUserInput = &i18n.Message{
 	ID:  "WrongUserInput",
 	One: "Input text is unexpected",
@@ -51,4 +56,16 @@ func LocalizedMessageMap(l *i18n.Localizer, ms ...*i18n.Message) (MessageMap, er
 		out[text] = m
 	}
 	return out, nil
+}
+
+func LocalizeMessages(l *i18n.Localizer, ms []*i18n.Message) ([]string, error) {
+	localized := make([]string, len(ms))
+	for i, m := range ms {
+		s, err := l.LocalizeMessage(m)
+		if err != nil {
+			return nil, err
+		}
+		localized[i] = s
+	}
+	return localized, nil
 }

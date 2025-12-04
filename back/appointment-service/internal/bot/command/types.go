@@ -20,8 +20,8 @@ type LocalizationProvider interface {
 
 const (
 	ChoiceTypeNone  ChoiceType = ""
-	ChoiceTypeDays             = "CT_Days"
-	ChoiceTypeSlots            = "CT_Slots"
+	ChoiceTypeDays  ChoiceType = "CT_Days"
+	ChoiceTypeSlots ChoiceType = "CT_Slots"
 )
 
 type ChatContext struct {
