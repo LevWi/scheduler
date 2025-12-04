@@ -28,6 +28,16 @@ var Done = &i18n.Message{
 	One: "Done",
 }
 
+var WrongUserInput = &i18n.Message{
+	ID:  "WrongUserInput",
+	One: "Input text is unexpected",
+}
+
+var InternalErrorOccurred = &i18n.Message{
+	ID:  "InternalErrorOccurred",
+	One: "Internal error occurred",
+}
+
 type MessageConstant = i18n.Message
 type MessageMap map[string]*MessageConstant
 

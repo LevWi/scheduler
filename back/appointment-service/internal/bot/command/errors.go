@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	common "scheduler/appointment-service/internal"
@@ -18,3 +19,5 @@ func checkStatusCode(resp *http.Response) error {
 		return fmt.Errorf("http response: unexpected response (%s)", resp.Status)
 	}
 }
+
+var ErrWrongUserInput = errors.New("wrong user input")

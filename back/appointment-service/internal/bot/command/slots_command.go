@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
@@ -10,10 +11,9 @@ import (
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
-type ChatOutput interface {
-	PrintSlots(r *Request, m []LabeledSlot) error
-	ConfirmAppointment(r *Request, m []LabeledSlot) error
-	ConfirmCancel(r *Request) error
+type ChatSlotsOutput interface {
+	PrintSlots(c *ChatContext, m []LabeledSlot) error
+	ConfirmAppointment(c *ChatContext, m []LabeledSlot) error
 }
 
 type LabeledSlot struct {
@@ -59,29 +59,36 @@ type commands struct {
 }
 
 type slotsSmDeps struct {
-	MP       MessageMapProvider
-	Chat     ChatOutput
+	LP       LocalizationProvider
+	Chat     ChatSlotsOutput
 	Commands *commands
 }
 
-type SlotsCommandSMachine struct {
+type SlotSelectionCommand struct {
 	availableSlots []LabeledSlot
 	deps           *slotsSmDeps
 }
 
-func (sm *SlotsCommandSMachine) Process(r *Request) error {
-	m, err := sm.deps.MP.Get()
-	if err != nil {
-		return err
-	}
+type SlotSelectionResult uint
 
-	c, ok := m[r.Text]
-	if !ok {
-		return common.ErrNotFound
-	}
+const (
+	SlotSelectionResultNotSet SlotSelectionResult = iota
+	SlotSelectionResultContinue
+	SlotSelectionResultDone
+)
 
-	//TODO Need handle "Cancel" first
+func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
 	if sm.availableSlots == nil {
+		m, err := sm.deps.LP.LocalizedMap()
+		if err != nil {
+			return SlotSelectionResultNotSet, err
+		}
+
+		c, ok := m[r.Text]
+		if !ok {
+			return SlotSelectionResultNotSet, errors.Join(ErrWrongUserInput, common.ErrNotFound)
+		}
+
 		var slots []common.Slot
 		switch c {
 		case messages.NextWeek:
@@ -89,32 +96,32 @@ func (sm *SlotsCommandSMachine) Process(r *Request) error {
 		case messages.ThisWeek:
 			slots, err = sm.deps.Commands.WeekSlots.ThisWeek(r.Ctx, r.Now)
 		default:
-			err = fmt.Errorf("%w: unexpected message text ID %s (%s)", common.ErrInvalidArgument, c.ID, r.Text)
+			err = fmt.Errorf("%w: unexpected message text ID %s (%s)", ErrWrongUserInput, c.ID, r.Text)
 		}
 
 		if err != nil {
-			return err
+			return SlotSelectionResultNotSet, err
 		}
 		sm.availableSlots = ToLabeledSlot(slots)
-		return sm.deps.Chat.PrintSlots(r, sm.availableSlots)
+		return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, sm.availableSlots)
 	} else {
 		if r.Text != "" {
-			return fmt.Errorf("%w: input text should be empty", common.ErrInvalidArgument)
+			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
 		}
 
 		if len(r.Choices.IDs) == 0 {
-			return fmt.Errorf("%w: expected user choices", common.ErrInvalidArgument)
+			return SlotSelectionResultContinue, fmt.Errorf("%w: expected user choices", ErrWrongUserInput)
 		}
 
 		switch r.Choices.Type {
 		case ChoiceTypeDays:
 			//For simplicity only one day now
 			if len(r.Choices.IDs) != 1 {
-				return fmt.Errorf("%w: expected 1 choice", common.ErrInvalidArgument)
+				return SlotSelectionResultContinue, fmt.Errorf("%w: expected 1 choice", ErrWrongUserInput)
 			}
 			day := time.Weekday(r.Choices.IDs[0])
 			if day > time.Saturday || day < time.Sunday {
-				return fmt.Errorf("%w: bad day index %v", common.ErrInvalidArgument, day)
+				return SlotSelectionResultContinue, fmt.Errorf("%w: bad day index %v", ErrWrongUserInput, day)
 			}
 
 			tmpArray := make([]LabeledSlot, 0, 16)
@@ -124,11 +131,11 @@ func (sm *SlotsCommandSMachine) Process(r *Request) error {
 				}
 			}
 			sm.availableSlots = tmpArray
-			return sm.deps.Chat.PrintSlots(r, sm.availableSlots)
+			return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, sm.availableSlots)
 		case ChoiceTypeSlots:
 			//TODO need logic for multiple slot choices
 			if len(r.Choices.IDs) != 1 {
-				return fmt.Errorf("%w: wrong choices len (%v)", common.ErrInvalidArgument, len(r.Choices.IDs))
+				return SlotSelectionResultContinue, fmt.Errorf("%w: wrong choices len (%v)", ErrWrongUserInput, len(r.Choices.IDs))
 			}
 			tmpArray := make([]common.Slot, len(r.Choices.IDs))
 			tmpPrint := make([]LabeledSlot, len(r.Choices.IDs))
@@ -139,28 +146,26 @@ func (sm *SlotsCommandSMachine) Process(r *Request) error {
 				}
 			}
 
-			err = sm.deps.Commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
+			err := sm.deps.Commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
 			if err != nil {
-				return err
+				return SlotSelectionResultContinue, err
 			}
 
-			return sm.deps.Chat.ConfirmAppointment(r, tmpPrint)
-		case ChoiceTypeNone:
-			return fmt.Errorf("%w: ChoiceType is not set", common.ErrInvalidArgument)
+			return SlotSelectionResultDone, sm.deps.Chat.ConfirmAppointment(r.ChatContext, tmpPrint)
 		default:
-			return fmt.Errorf("%w: unexpected ChoiceType", common.ErrInternal)
+			return SlotSelectionResultContinue, fmt.Errorf("%w: unexpected ChoiceType (%v)", common.ErrInvalidArgument, r.Choices.Type)
 		}
 	}
 }
 
-func (sm *SlotsCommandSMachine) Cancel() {
-	sm.availableSlots = nil
+func (mm *SlotSelectionCommand) Cancel() {
+	mm.availableSlots = nil
 }
 
-func NewSlotsCommandStMachine(mmp MessageMapProvider, chat ChatOutput, weekSlots *WeekSlots, appointment Appointment) *SlotsCommandSMachine {
-	sm := &SlotsCommandSMachine{
+func NewSlotSelectionCommand(mmp LocalizationProvider, chat ChatSlotsOutput, weekSlots *WeekSlots, appointment Appointment) *SlotSelectionCommand {
+	sm := &SlotSelectionCommand{
 		deps: &slotsSmDeps{
-			MP:   mmp,
+			LP:   mmp,
 			Chat: chat,
 			Commands: &commands{
 				WeekSlots:   weekSlots,
