@@ -13,7 +13,7 @@ import (
 
 type ChatSlotsOutput interface {
 	ChatOutput
-	PrintSlots(c *ChatContext, m []LabeledSlot) error
+	PrintSlots(c *ChatContext, message string, m []LabeledSlot) error
 	ConfirmAppointment(c *ChatContext, m []LabeledSlot) error
 }
 
@@ -79,18 +79,19 @@ const (
 )
 
 // TODO write here or in MainMenu?
-func (sm *SlotSelectionCommand) ShowRangesMenu(c *ChatContext) error {
+func (sm *SlotSelectionCommand) ShowRangesMenu(c *ChatContext, additional ...*i18n.Message) error {
 	l, err := sm.deps.LP.Localizer()
 	if err != nil {
 		return err
 	}
 
-	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek, messages.Cancel}
+	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek}
+	options = append(options, additional...)
 	localized, err := messages.LocalizeMessages(l, options)
 	if err != nil {
 		return err
 	}
-	return sm.deps.Chat.ShowMenu(c, localized)
+	return sm.deps.Chat.ShowMenu(c, "TBD", localized)
 }
 
 func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
@@ -119,7 +120,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 			return SlotSelectionResultNotSet, err
 		}
 		sm.availableSlots = ToLabeledSlot(slots)
-		return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, sm.availableSlots)
+		return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, "TBD123", sm.availableSlots)
 	} else {
 		if r.Text != "" {
 			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
@@ -147,7 +148,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				}
 			}
 			sm.availableSlots = tmpArray
-			return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, sm.availableSlots)
+			return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, "TBD151", sm.availableSlots)
 		case ChoiceTypeSlots:
 			//TODO need logic for multiple slot choices
 			if len(r.Choices.IDs) != 1 {

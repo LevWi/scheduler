@@ -5,8 +5,12 @@ import (
 	"scheduler/appointment-service/internal/bot"
 )
 
-func NewDefaultSlotSelectionCommand(mmp LocalizationProvider, chat ChatSlotsOutput, businessID common.ID, connection *bot.SchedulerConnection) *SlotSelectionCommand {
-	return NewSlotSelectionCommand(mmp, chat,
+func newDefaultSlotSelectionCommand(lp LocalizationProvider, chat ChatSlotsOutput, businessID common.ID, connection *bot.SchedulerConnection) *SlotSelectionCommand {
+	return NewSlotSelectionCommand(lp, chat,
 		NewWeekSlots(&HttpSlotsProvider{baseURL: connection.URL, businessID: businessID}),
 		&HttpAppointment{Connection: connection})
+}
+
+func NewDefaultMainMenu(lp LocalizationProvider, chat ChatSlotsOutput, businessID common.ID, connection *bot.SchedulerConnection) *MainMenu {
+	return NewMainMenu(lp, chat, newDefaultSlotSelectionCommand(lp, chat, businessID, connection))
 }

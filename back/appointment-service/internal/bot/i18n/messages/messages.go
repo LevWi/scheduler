@@ -28,6 +28,11 @@ var Done = &i18n.Message{
 	One: "Done",
 }
 
+var Help = &i18n.Message{
+	ID:  "Help",
+	One: "Help",
+}
+
 var BookSlot = &i18n.Message{
 	ID:  "BookSlot",
 	One: "Book a slot",
@@ -41,6 +46,11 @@ var WrongUserInput = &i18n.Message{
 var InternalErrorOccurred = &i18n.Message{
 	ID:  "InternalErrorOccurred",
 	One: "Internal error occurred",
+}
+
+var HelpMessage = &i18n.Message{
+	ID:  "HelpMessage",
+	One: "TODO: Add big help message here",
 }
 
 type MessageConstant = i18n.Message
