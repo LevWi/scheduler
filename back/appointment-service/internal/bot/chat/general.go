@@ -7,8 +7,9 @@ import (
 type ChatID any
 
 type ChatOption struct {
-	ID   string
-	Text string
+	ID       string
+	Text     string
+	TextLong string
 }
 
 type ChatContext struct {

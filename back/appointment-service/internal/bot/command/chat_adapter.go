@@ -1,0 +1,83 @@
+package command
+
+import (
+	"fmt"
+	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/bot/chat"
+	"time"
+
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+)
+
+//TODO add here localizer?
+
+type ChatAdapter struct {
+	chat.Chat
+	loc Localization
+}
+
+const (
+	DateMarker = "bookDateOption_"
+	SlotMarker = "bookSlotOption_"
+)
+
+func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error {
+	localized, err := ca.loc.LocalizeMessage(m)
+	if err != nil {
+		return err
+	}
+	return ca.Print(c, localized)
+}
+
+func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops []LabeledSlot) error {
+	if len(ops) < 2 {
+		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
+	}
+
+	localized, err := ca.loc.LocalizeMessage(me)
+	if err != nil {
+		return err
+	}
+
+	loc := ops[0].Start.Location()
+	m := make(map[string]struct{}, len(ops))
+	for _, v := range ops {
+		key := v.Start.In(loc).Format(time.RFC822)
+		m[key] = struct{}{}
+	}
+
+	var chatOptions []chat.ChatOption
+	if len(m) > 1 {
+		chatOptions = make([]chat.ChatOption, len(m))
+		i := 0
+		for k := range m {
+			chatOptions[i].ID = DateMarker + k
+			chatOptions[i].Text = k //TODO need Localization here
+			i++
+		}
+	} else {
+		chatOptions = make([]chat.ChatOption, len(ops))
+		for i, v := range ops {
+			chatOptions[i].ID = SlotMarker + string(v.ID)
+			chatOptions[i].Text = v.Start.Format(time.DateTime) //TODO need Localization here
+		}
+	}
+
+	return ca.Chat.ShowOptions(c, localized, chatOptions)
+}
+
+// // TODO move to struct? to bot adapter?
+// func TimeShortFormat(df DateFormatter) TimeFormatFunc {
+// 	return func(t time.Time) string {
+// 		return fmt.Sprintf(
+// 			"%d %s (%s) %02d:%02d",
+// 			t.Day(),
+// 			df.MonthShort(t.Month()),
+// 			df.WeekDayShort(t.Weekday()),
+// 			t.Hour(),
+// 			t.Minute(),
+// 		)
+// 	}
+// }
+
+// type TimeFormatFunc func(time.Time) string

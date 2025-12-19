@@ -54,7 +54,7 @@ func (t *Tg) ShowMenu(c *chat.ChatContext, message string, options []string) err
 	})
 }
 
-func (t *Tg) PrintOptions(c *chat.ChatContext, message string, m []chat.ChatOption) error {
+func (t *Tg) ShowOptions(c *chat.ChatContext, message string, m []chat.ChatOption) error {
 	km := &models.InlineKeyboardMarkup{
 		InlineKeyboard: toInlineKeyboardButton(m),
 	}
@@ -80,7 +80,7 @@ func toInlineKeyboardButton(in []chat.ChatOption) [][]models.InlineKeyboardButto
 		b := []models.InlineKeyboardButton{
 			{
 				Text:         v.Text,
-				CallbackData: fmt.Sprintf("slot_id_%v", v.ID)},
+				CallbackData: fmt.Sprintf("slot_id_%v", v.ID)}, //TODO fix it
 		}
 		out = append(out, b)
 	}
