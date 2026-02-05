@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
@@ -13,7 +14,7 @@ import (
 
 type ChatAdapter struct {
 	chat.Chat
-	loc Localization
+	loc *Localization
 }
 
 const (
@@ -21,10 +22,17 @@ const (
 	SlotMarker = "bookSlotOption_"
 )
 
+var ErrLocalizeMessage = errors.New("localize message error")
+
+// TODO do we need error here. Or returning nil is enough
+func (ca *ChatAdapter) IdentifyMessage(message string) *i18n.Message {
+	return ca.loc.Map[message]
+}
+
 func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error {
 	localized, err := ca.loc.LocalizeMessage(m)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrLocalizeMessage, err)
 	}
 	return ca.Print(c, localized)
 }

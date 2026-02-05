@@ -30,10 +30,10 @@ type Request struct {
 	}
 }
 
-type LocalizationProvider interface {
-	LocalizedMap() (messages.MessageMap, error)
-	Localizer() (*i18n.Localizer, error)
-	DateFormatter() DateFormatter
+type Localization struct {
+	Map messages.MessageMap
+	i18n.Localizer
+	DateFormatter
 }
 
 type DateFormatter interface {
