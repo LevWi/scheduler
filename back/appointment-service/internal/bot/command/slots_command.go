@@ -5,17 +5,12 @@ import (
 	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
 	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
-
-type ChatSlotsOutput interface {
-	ChatOutput
-	PrintSlots(c *ChatContext, message string, m []LabeledSlot) error
-	ConfirmAppointment(c *ChatContext, m []LabeledSlot) error
-}
 
 type LabeledSlot struct {
 	ID int
@@ -29,17 +24,6 @@ func ToLabeledSlot(slots []common.Slot) []LabeledSlot {
 	}
 	return ls
 }
-
-// type WeekDaysSlotsMap map[time.Weekday][]LabeledSlot
-
-// func SlotsToWeekMap(in common.Intervals) WeekDaysSlotsMap {
-// 	m := make(WeekDaysSlotsMap)
-// 	for i, interval := range in {
-// 		wd := interval.Start.Weekday()
-// 		m[wd] = append(m[wd], LabeledSlot{ID: i, Interval: interval})
-// 	}
-// 	return m
-// }
 
 // TODO move it
 func CommandMap(l *i18n.Localizer) (messages.MessageMap, error) {
@@ -60,8 +44,7 @@ type commands struct {
 }
 
 type slotsSmDeps struct {
-	LP       LocalizationProvider
-	Chat     ChatSlotsOutput
+	Chat     *ChatAdapter
 	Commands *commands
 }
 
@@ -78,34 +61,27 @@ const (
 	SlotSelectionResultDone
 )
 
-// TODO write here or in MainMenu?
-func (sm *SlotSelectionCommand) ShowRangesMenu(c *ChatContext, additional ...*i18n.Message) error {
-	l, err := sm.deps.LP.Localizer()
-	if err != nil {
-		return err
-	}
+// TODO remove it. Only for skeleton
+var todo = &i18n.Message{
+	ID:  "TBD",
+	One: "TBD",
+}
 
+// TODO write here or in MainMenu?
+func (sm *SlotSelectionCommand) ShowRangesMenu(c *chat.ChatContext, additional ...*i18n.Message) error {
 	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek}
 	options = append(options, additional...)
-	localized, err := messages.LocalizeMessages(l, options)
-	if err != nil {
-		return err
-	}
-	return sm.deps.Chat.ShowMenu(c, "TBD", localized)
+	return sm.deps.Chat.ShowMenuMessages(c, todo, options)
 }
 
 func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
 	if sm.availableSlots == nil {
-		m, err := sm.deps.LP.LocalizedMap()
-		if err != nil {
-			return SlotSelectionResultNotSet, err
-		}
-
-		c, ok := m[r.Text]
-		if !ok {
+		c := sm.deps.Chat.IdentifyMessage(r.Text)
+		if c == nil {
 			return SlotSelectionResultNotSet, errors.Join(ErrWrongUserInput, common.ErrNotFound)
 		}
 
+		var err error
 		var slots []common.Slot
 		switch c {
 		case messages.NextWeek:
@@ -120,7 +96,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 			return SlotSelectionResultNotSet, err
 		}
 		sm.availableSlots = ToLabeledSlot(slots)
-		return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, "TBD123", sm.availableSlots)
+		return SlotSelectionResultContinue, sm.deps.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 	} else {
 		if r.Text != "" {
 			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
@@ -148,7 +124,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				}
 			}
 			sm.availableSlots = tmpArray
-			return SlotSelectionResultContinue, sm.deps.Chat.PrintSlots(r.ChatContext, "TBD151", sm.availableSlots)
+			return SlotSelectionResultContinue, sm.deps.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 		case ChoiceTypeSlots:
 			//TODO need logic for multiple slot choices
 			if len(r.Choices.IDs) != 1 {
@@ -168,7 +144,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				return SlotSelectionResultContinue, err
 			}
 
-			return SlotSelectionResultDone, sm.deps.Chat.ConfirmAppointment(r.ChatContext, tmpPrint)
+			return SlotSelectionResultDone, sm.deps.Chat.PrintMessage(r.ChatContext, messages.Done)
 		default:
 			return SlotSelectionResultContinue, fmt.Errorf("%w: unexpected ChoiceType (%v)", common.ErrInvalidArgument, r.Choices.Type)
 		}
@@ -179,10 +155,9 @@ func (mm *SlotSelectionCommand) Cancel() {
 	mm.availableSlots = nil
 }
 
-func NewSlotSelectionCommand(mmp LocalizationProvider, chat ChatSlotsOutput, weekSlots *WeekSlots, appointment Appointment) *SlotSelectionCommand {
+func NewSlotSelectionCommand(chat *ChatAdapter, weekSlots *WeekSlots, appointment Appointment) *SlotSelectionCommand {
 	sm := &SlotSelectionCommand{
 		deps: &slotsSmDeps{
-			LP:   mmp,
 			Chat: chat,
 			Commands: &commands{
 				WeekSlots:   weekSlots,

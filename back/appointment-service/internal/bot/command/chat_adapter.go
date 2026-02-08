@@ -5,6 +5,7 @@ import (
 	"fmt"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
+	"scheduler/appointment-service/internal/bot/i18n/messages"
 	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -37,6 +38,19 @@ func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error 
 	return ca.Print(c, localized)
 }
 
+func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, ops []*i18n.Message) error {
+	localized, err := messages.LocalizeMessages(&ca.loc.Localizer, ops)
+	if err != nil {
+		return err
+	}
+
+	mess, err := ca.loc.Localizer.LocalizeMessage(m)
+	if err != nil {
+		return err
+	}
+	return ca.ShowMenu(c, mess, localized)
+}
+
 func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops []LabeledSlot) error {
 	if len(ops) < 2 {
 		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
@@ -66,7 +80,7 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 	} else {
 		chatOptions = make([]chat.ChatOption, len(ops))
 		for i, v := range ops {
-			chatOptions[i].ID = SlotMarker + string(v.ID)
+			chatOptions[i].ID = fmt.Sprintf("%s%d", SlotMarker, v.ID)
 			chatOptions[i].Text = v.Start.Format(time.DateTime) //TODO need Localization here
 		}
 	}
