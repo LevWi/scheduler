@@ -15,13 +15,13 @@ import (
 
 type ChatAdapter struct {
 	chat.Chat
-	loc *Localization
+	Loc *messages.Localization
 }
 
-func NewChatAdapter(chat chat.Chat, loc *Localization) *ChatAdapter {
+func NewChatAdapter(chat chat.Chat, loc *messages.Localization) *ChatAdapter {
 	return &ChatAdapter{
 		Chat: chat,
-		loc:  loc,
+		Loc:  loc,
 	}
 }
 
@@ -32,13 +32,9 @@ const (
 
 var ErrLocalizeMessage = errors.New("localize message error")
 
-// TODO do we need error here. Or returning nil is enough
-func (ca *ChatAdapter) IdentifyMessage(message string) *i18n.Message {
-	return ca.loc.Map[message]
-}
-
 func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error {
-	localized, err := ca.loc.LocalizeMessage(m)
+	l := ca.Loc.Localizer()
+	localized, err := l.LocalizeMessage(m)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrLocalizeMessage, err)
 	}
@@ -46,12 +42,13 @@ func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error 
 }
 
 func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, ops []*i18n.Message) error {
-	localized, err := messages.LocalizeMessages(ca.loc.Localizer, ops)
+	l := ca.Loc.Localizer()
+	localized, err := messages.LocalizeMessages(l, ops)
 	if err != nil {
 		return err
 	}
 
-	mess, err := ca.loc.Localizer.LocalizeMessage(m)
+	mess, err := l.LocalizeMessage(m)
 	if err != nil {
 		return err
 	}
@@ -63,7 +60,7 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
 	}
 
-	localized, err := ca.loc.LocalizeMessage(me)
+	localized, err := ca.Loc.Localizer().LocalizeMessage(me)
 	if err != nil {
 		return err
 	}

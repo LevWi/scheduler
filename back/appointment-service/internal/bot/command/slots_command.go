@@ -34,8 +34,10 @@ type commands struct {
 	Appointment Appointment
 }
 
+type IdentifyMessageFunc func(string) *messages.MessageConstant
+
 type slotsSmDeps struct {
-	Chat     *ChatAdapter
+	MD       *MenuDeps
 	Commands *commands
 }
 
@@ -62,12 +64,12 @@ var todo = &i18n.Message{
 func (sm *SlotSelectionCommand) ShowRangesMenu(c *chat.ChatContext, additional ...*i18n.Message) error {
 	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek}
 	options = append(options, additional...)
-	return sm.deps.Chat.ShowMenuMessages(c, todo, options)
+	return sm.deps.MD.Chat.ShowMenuMessages(c, todo, options)
 }
 
 func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
 	if sm.availableSlots == nil {
-		c := sm.deps.Chat.IdentifyMessage(r.Text)
+		c := sm.deps.MD.MM.IdentifyMessage(r.Text)
 		if c == nil {
 			return SlotSelectionResultNotSet, errors.Join(ErrWrongUserInput, common.ErrNotFound)
 		}
@@ -87,7 +89,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 			return SlotSelectionResultNotSet, err
 		}
 		sm.availableSlots = ToLabeledSlot(slots)
-		return SlotSelectionResultContinue, sm.deps.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
+		return SlotSelectionResultContinue, sm.deps.MD.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 	} else {
 		if r.Text != "" {
 			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
@@ -115,7 +117,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				}
 			}
 			sm.availableSlots = tmpArray
-			return SlotSelectionResultContinue, sm.deps.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
+			return SlotSelectionResultContinue, sm.deps.MD.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 		case ChoiceTypeSlots:
 			//TODO need logic for multiple slot choices
 			if len(r.Choices.IDs) != 1 {
@@ -135,7 +137,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				return SlotSelectionResultContinue, err
 			}
 
-			return SlotSelectionResultDone, sm.deps.Chat.PrintMessage(r.ChatContext, messages.Done)
+			return SlotSelectionResultDone, sm.deps.MD.Chat.PrintMessage(r.ChatContext, messages.Done)
 		default:
 			return SlotSelectionResultContinue, fmt.Errorf("%w: unexpected ChoiceType (%v)", common.ErrInvalidArgument, r.Choices.Type)
 		}
@@ -146,10 +148,10 @@ func (mm *SlotSelectionCommand) Cancel() {
 	mm.availableSlots = nil
 }
 
-func NewSlotSelectionCommand(chat *ChatAdapter, weekSlots *WeekSlots, appointment Appointment) *SlotSelectionCommand {
+func newSlotSelectionCommand(md *MenuDeps, weekSlots *WeekSlots, appointment Appointment) *SlotSelectionCommand {
 	sm := &SlotSelectionCommand{
 		deps: &slotsSmDeps{
-			Chat: chat,
+			MD: md,
 			Commands: &commands{
 				WeekSlots:   weekSlots,
 				Appointment: appointment,

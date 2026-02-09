@@ -56,6 +56,10 @@ var HelpMessage = &i18n.Message{
 type MessageConstant = i18n.Message
 type MessageMap map[string]*MessageConstant
 
+func (m MessageMap) IdentifyMessage(s string) *MessageConstant {
+	return m[s]
+}
+
 func LocalizedMessageMap(l *i18n.Localizer, ms ...*i18n.Message) (MessageMap, error) {
 	out := make(MessageMap, len(ms))
 	for _, m := range ms {

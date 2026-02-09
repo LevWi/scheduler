@@ -18,20 +18,73 @@ const (
 	menuSlotSelection
 )
 
+type MenuDeps struct {
+	LangTag string
+	Chat    *ChatAdapter
+	Loc     *messages.Localization
+	MM      messages.MessageMap
+}
+
+func (md *MenuDeps) SetLanguage(l string) error {
+	if md.LangTag != l {
+		md.Loc.SetLanguage(l)
+		m, err := commandMap(md.Loc.Localizer())
+		if err != nil {
+			return err
+		}
+		md.MM = m
+		md.LangTag = l
+		md.Chat.Loc = md.Loc
+	}
+	return nil
+}
+
+func NewMenuDeps(ch chat.Chat, loc *messages.Localization) (*MenuDeps, error) {
+	ca := &ChatAdapter{
+		Chat: ch,
+		Loc:  loc,
+	}
+	m, err := commandMap(loc.Localizer())
+	if err != nil {
+		return nil, err
+	}
+	return &MenuDeps{
+			LangTag: loc.LangTag(),
+			Chat:    ca,
+			Loc:     loc,
+			MM:      m,
+		},
+		nil
+}
+
+func commandMap(l *i18n.Localizer) (messages.MessageMap, error) {
+	return messages.LocalizedMessageMap(l,
+		messages.BookSlot,
+		messages.Help,
+		messages.NextWeek,
+		messages.ThisWeek,
+		messages.Cancel,
+		messages.Done)
+}
+
 // TODO cancel by timeout if user not reacted. Add mutex
 type MainMenu struct {
-	Chat         *ChatAdapter
-	SlotCommands *SlotSelectionCommand
+	menuDeps     *MenuDeps
+	slotCommands *SlotSelectionCommand
 	state        mainMenuState
 }
 
+func (menu *MainMenu) SetLanguage(l string) error {
+	return menu.SetLanguage(l)
+}
+
 func (menu *MainMenu) ShowHelp(c *chat.ChatContext) error {
-	return menu.Chat.PrintMessage(c, messages.HelpMessage)
+	return menu.menuDeps.Chat.PrintMessage(c, messages.HelpMessage)
 }
 
 // TODO fix case sensitive input
 func (menu *MainMenu) Process(r *Request) error {
-	c := menu.Chat.IdentifyMessage(r.Text)
+	c := menu.menuDeps.MM.IdentifyMessage(r.Text)
 
 	if c == messages.Cancel {
 		menu.BackToStart()
@@ -42,7 +95,7 @@ func (menu *MainMenu) Process(r *Request) error {
 	switch menu.state {
 	case menuStart:
 		if c == messages.BookSlot {
-			err := menu.SlotCommands.ShowRangesMenu(r.ChatContext, messages.Cancel)
+			err := menu.slotCommands.ShowRangesMenu(r.ChatContext, messages.Cancel)
 			if err != nil {
 				slog.ErrorContext(r.Ctx, "mainMenu menuStart", "err", err.Error())
 				return err
@@ -54,7 +107,7 @@ func (menu *MainMenu) Process(r *Request) error {
 			return menu.showMessageForce(r.ChatContext, messages.WrongUserInput)
 		}
 	case menuSlotSelection:
-		result, err := menu.SlotCommands.Process(r)
+		result, err := menu.slotCommands.Process(r)
 		if err != nil {
 			if errors.Is(err, ErrWrongUserInput) {
 				//This is possible behavior for user. Not an error
@@ -82,9 +135,9 @@ func (menu *MainMenu) Process(r *Request) error {
 }
 
 func (menu *MainMenu) showMessageForce(c *chat.ChatContext, msg *i18n.Message) error {
-	err := menu.Chat.PrintMessage(c, msg)
+	err := menu.menuDeps.Chat.PrintMessage(c, msg)
 	if errors.Is(err, ErrLocalizeMessage) {
-		err = menu.Chat.Print(c, msg.One)
+		err = menu.menuDeps.Chat.Print(c, msg.One)
 	}
 	return err
 }
@@ -94,18 +147,18 @@ func (menu *MainMenu) wrongUserInput(l *i18n.Localizer, c *chat.ChatContext) err
 	if err != nil {
 		s = messages.WrongUserInput.One
 	}
-	return errors.Join(err, menu.Chat.Print(c, s))
+	return errors.Join(err, menu.menuDeps.Chat.Print(c, s))
 }
 
 func (menu *MainMenu) BackToStart() {
 	menu.state = menuStart
-	menu.SlotCommands.Cancel()
+	menu.slotCommands.Cancel()
 }
 
-func NewMainMenu(chat *ChatAdapter, slotCommands *SlotSelectionCommand) *MainMenu {
+func newMainMenu(md *MenuDeps, slotCommands *SlotSelectionCommand) *MainMenu {
 	return &MainMenu{
-		Chat:         chat,
-		SlotCommands: slotCommands,
+		menuDeps:     md,
+		slotCommands: slotCommands,
 		state:        menuStart,
 	}
 }
