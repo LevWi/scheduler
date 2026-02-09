@@ -25,15 +25,6 @@ func ToLabeledSlot(slots []common.Slot) []LabeledSlot {
 	return ls
 }
 
-// TODO move it
-func CommandMap(l *i18n.Localizer) (messages.MessageMap, error) {
-	return messages.LocalizedMessageMap(l,
-		messages.NextWeek,
-		messages.ThisWeek,
-		messages.Cancel,
-		messages.Done)
-}
-
 type Appointment interface {
 	AddSlots(ctx context.Context, customer common.ID, slots []common.Slot) error
 }

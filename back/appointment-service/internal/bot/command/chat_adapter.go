@@ -18,6 +18,13 @@ type ChatAdapter struct {
 	loc *Localization
 }
 
+func NewChatAdapter(chat chat.Chat, loc *Localization) *ChatAdapter {
+	return &ChatAdapter{
+		Chat: chat,
+		loc:  loc,
+	}
+}
+
 const (
 	DateMarker = "bookDateOption_"
 	SlotMarker = "bookSlotOption_"
@@ -39,7 +46,7 @@ func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error 
 }
 
 func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, ops []*i18n.Message) error {
-	localized, err := messages.LocalizeMessages(&ca.loc.Localizer, ops)
+	localized, err := messages.LocalizeMessages(ca.loc.Localizer, ops)
 	if err != nil {
 		return err
 	}

@@ -32,7 +32,7 @@ type Request struct {
 
 type Localization struct {
 	Map messages.MessageMap
-	i18n.Localizer
+	*i18n.Localizer
 	DateFormatter
 }
 

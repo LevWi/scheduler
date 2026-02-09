@@ -42,6 +42,10 @@ func (a *HttpAppointment) AddSlots(ctx context.Context, customer common.ID, slot
 	req.Header.Set("X-Client-ID", a.Connection.ClientId)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.Connection.Token))
 
+	q := req.URL.Query()
+	q.Add("customer_id", customer)
+	req.URL.RawQuery = q.Encode()
+
 	//TODO with timeout?
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
