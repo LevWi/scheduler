@@ -14,11 +14,11 @@ const (
 	ChoiceTypeSlots ChoiceType = "CT_Slots"
 )
 
-// now - is current time corresponding customer local time
-// Local time should be from business config or from user config
+// Time - time the message was sent
+// Local user time should be from business config or from user
 type Request struct {
 	*chat.ChatContext
-	Now      time.Time
+	Time     time.Time
 	Text     string
 	Customer string
 	Choices  struct {

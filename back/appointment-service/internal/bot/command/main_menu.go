@@ -83,6 +83,7 @@ func (menu *MainMenu) ShowHelp(c *chat.ChatContext) error {
 }
 
 // TODO fix case sensitive input
+// TODO need user time zone setting
 func (menu *MainMenu) Process(r *Request) error {
 	c := menu.menuDeps.MM.IdentifyMessage(r.Text)
 

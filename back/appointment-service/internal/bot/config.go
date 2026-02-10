@@ -5,6 +5,7 @@ import "errors"
 // TODO For slots GET request is no auth required. So business_id used in request only here.
 // Ether we need to set BusinessID in config (but it strongly should corresponding
 // bot's client id or errors can occure) or we need change HTTP API
+// TODO add default business time zone
 type SchedulerConnection struct {
 	URL        string `cfg:"url"`
 	BusinessID string `cfg:"business_id"`

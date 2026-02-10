@@ -78,9 +78,10 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 		var slots []common.Slot
 		switch c {
 		case messages.NextWeek:
-			slots, err = sm.deps.Commands.WeekSlots.NextWeek(r.Ctx, r.Now)
+			//TODO what time zone should be used here? Need to take on account user timezone
+			slots, err = sm.deps.Commands.WeekSlots.NextWeek(r.Ctx, r.Time)
 		case messages.ThisWeek:
-			slots, err = sm.deps.Commands.WeekSlots.ThisWeek(r.Ctx, r.Now)
+			slots, err = sm.deps.Commands.WeekSlots.ThisWeek(r.Ctx, r.Time)
 		default:
 			err = fmt.Errorf("%w: unexpected message text ID %s (%s)", ErrWrongUserInput, c.ID, r.Text)
 		}
