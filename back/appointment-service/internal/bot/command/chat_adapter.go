@@ -26,7 +26,7 @@ func NewChatAdapter(chat chat.Chat, loc *messages.Localization) *ChatAdapter {
 }
 
 const (
-	DateMarker = "bookDateOption_"
+	DayMarker  = "bookDayOption_"
 	SlotMarker = "bookSlotOption_"
 )
 
@@ -68,7 +68,8 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 	loc := ops[0].Start.Location()
 	m := make(map[string]struct{}, len(ops))
 	for _, v := range ops {
-		key := v.Start.In(loc).Format(time.RFC822)
+		t := v.Start.In(loc)
+		key := t.Format(time.DateOnly)
 		m[key] = struct{}{}
 	}
 
@@ -77,7 +78,7 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 		chatOptions = make([]chat.ChatOption, len(m))
 		i := 0
 		for k := range m {
-			chatOptions[i].ID = DateMarker + k
+			chatOptions[i].ID = fmt.Sprintf("%s%s", DayMarker, k)
 			chatOptions[i].Text = k //TODO need Localization here
 			i++
 		}

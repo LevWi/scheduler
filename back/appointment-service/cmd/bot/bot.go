@@ -53,6 +53,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData,
+		"slot_id_", //TODO move it to bot package
+		bot.MatchTypePrefix,
+		makeOptionsCallbackHandler(menu))
 	b.RegisterHandlerMatchFunc(messageMatchFunc, makeHandler(menu))
 	b.Start(ctx)
 }
@@ -81,8 +85,53 @@ func makeHandler(menu *command.MainMenu) bot.HandlerFunc {
 		}
 		err := menu.Process(r)
 		if err != nil {
-			slog.Error("[menu.Process]", "err", err.Error())
-			return
+			slog.Error("[Handler:menu.Process]", "err", err.Error())
+		}
+	}
+}
+
+func makeOptionsCallbackHandler(menu *command.MainMenu) bot.HandlerFunc {
+	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+		// answering callback query first to let Telegram know that we received the callback query,
+		// and we're handling it. Otherwise, Telegram might retry sending the update repetitively
+		// as it thinks the callback query doesn't reach to our application. learn more by
+		// reading the footnote of the https://core.telegram.org/bots/api#callbackquery type.
+		//TODO show some message to user if error?
+		b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+			CallbackQueryID: update.CallbackQuery.ID,
+			ShowAlert:       false,
+		})
+
+		slog.Debug("[OptionsCallbackHandler]", "choice", update.CallbackQuery.Data,
+			"user", update.CallbackQuery.From.ID)
+
+		chctx := &chat.ChatContext{
+			Ctx:    ctx,
+			ChatID: update.CallbackQuery.From.ID,
+		}
+
+		var t time.Time
+		if update.CallbackQuery.Message.Message != nil &&
+			update.CallbackQuery.Message.Type == models.MaybeInaccessibleMessageTypeMessage {
+			t = time.Unix(int64(update.CallbackQuery.Message.Message.Date), 0)
+		} else {
+			t = time.Now().UTC()
+		}
+
+		r := &command.Request{
+			ChatContext: chctx,
+			//According manual it is Unix time
+			Time: t,
+			//Text:   ,
+			Customer: fmt.Sprint(update.CallbackQuery.From.ID),
+			Choices: []command.ChoiceID{
+				update.CallbackQuery.Data[len("slot_id_"):], //TODO move slot_id_ to bot package
+			},
+		}
+
+		err := menu.Process(r)
+		if err != nil {
+			slog.Error("[OptionsCallbackHandler:menu.Process]", "err", err.Error())
 		}
 	}
 }

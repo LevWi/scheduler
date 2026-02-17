@@ -11,14 +11,14 @@ import (
 type Localization struct {
 	bundle  *i18n.Bundle
 	langTag string
-	df      DateFormatter //TODO not used now
+	DF      DateFormatter //TODO not used now
 }
 
 func NewLocalization(bundle *i18n.Bundle, langTag string) *Localization {
 	return &Localization{
 		bundle:  bundle,
 		langTag: langTag,
-		df:      date.DateFormatRu{},
+		DF:      date.DateFormatRu{},
 	}
 }
 

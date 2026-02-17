@@ -7,6 +7,8 @@ import (
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -96,17 +98,25 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
 		}
 
-		if len(r.Choices.IDs) == 0 {
+		if len(r.Choices) == 0 {
 			return SlotSelectionResultContinue, fmt.Errorf("%w: expected user choices", ErrWrongUserInput)
 		}
 
-		switch r.Choices.Type {
-		case ChoiceTypeDays:
+		switch {
+		case strings.HasPrefix(r.Choices[0], DayMarker):
 			//For simplicity only one day now
-			if len(r.Choices.IDs) != 1 {
+			if len(r.Choices) != 1 {
 				return SlotSelectionResultContinue, fmt.Errorf("%w: expected 1 choice", ErrWrongUserInput)
 			}
-			day := time.Weekday(r.Choices.IDs[0])
+
+			timeSrt := r.Choices[0][len(DayMarker):]
+			//TODO time zone?
+			date, err := time.Parse(time.DateOnly, timeSrt)
+			if err != nil {
+				return SlotSelectionResultNotSet, fmt.Errorf("%w: for %v", err, timeSrt)
+			}
+
+			day := date.Weekday()
 			if day > time.Saturday || day < time.Sunday {
 				return SlotSelectionResultContinue, fmt.Errorf("%w: bad day index %v", ErrWrongUserInput, day)
 			}
@@ -119,28 +129,36 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 			}
 			sm.availableSlots = tmpArray
 			return SlotSelectionResultContinue, sm.deps.MD.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
-		case ChoiceTypeSlots:
+		case strings.HasPrefix(r.Choices[0], SlotMarker):
 			//TODO need logic for multiple slot choices
-			if len(r.Choices.IDs) != 1 {
-				return SlotSelectionResultContinue, fmt.Errorf("%w: wrong choices len (%v)", ErrWrongUserInput, len(r.Choices.IDs))
+			if len(r.Choices) != 1 {
+				return SlotSelectionResultContinue, fmt.Errorf("%w: wrong choices len (%v)", ErrWrongUserInput, len(r.Choices))
 			}
-			tmpArray := make([]common.Slot, len(r.Choices.IDs))
-			tmpPrint := make([]LabeledSlot, len(r.Choices.IDs))
+
+			idxStr := r.Choices[0][len(SlotMarker):]
+			id, err := strconv.Atoi(idxStr)
+			if err != nil {
+				return SlotSelectionResultNotSet, fmt.Errorf("%w: for %v", err, idxStr)
+			}
+
+			tmpArray := make([]common.Slot, len(r.Choices))
+			tmpPrint := make([]LabeledSlot, len(r.Choices))
 			for _, slot := range sm.availableSlots {
-				if slot.ID == r.Choices.IDs[0] {
+				if slot.ID == id {
 					tmpArray = append(tmpArray, slot.Slot)
 					tmpPrint = append(tmpPrint, slot)
 				}
 			}
 
-			err := sm.deps.Commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
+			err = sm.deps.Commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
 			if err != nil {
 				return SlotSelectionResultContinue, err
 			}
 
 			return SlotSelectionResultDone, sm.deps.MD.Chat.PrintMessage(r.ChatContext, messages.Done)
 		default:
-			return SlotSelectionResultContinue, fmt.Errorf("%w: unexpected ChoiceType (%v)", common.ErrInvalidArgument, r.Choices.Type)
+			return SlotSelectionResultContinue, fmt.Errorf("%w: unexpected ChoiceType (%v)",
+				common.ErrInvalidArgument, r.Choices[0])
 		}
 	}
 }
