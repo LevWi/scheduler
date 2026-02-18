@@ -47,17 +47,17 @@ func main() {
 
 	localization := messages.NewLocalization(bundle, "ru")
 	cha := &telegram.Tg{Bot: b}
-	menu, err := command.NewDefaultMainMenu(cha, localization, &cfg.SchedulerAPI)
+	dialogStorage, err := command.NewDialogStorage(cha, localization, &cfg.SchedulerAPI)
 	if err != nil {
-		slog.Error("[NewDefaultMainMenu]", "err", err.Error())
+		slog.Error("[NewDialogStorage]", "err", err.Error())
 		log.Fatal(err)
 	}
 
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData,
 		"slot_id_", //TODO move it to bot package
 		bot.MatchTypePrefix,
-		makeOptionsCallbackHandler(menu))
-	b.RegisterHandlerMatchFunc(messageMatchFunc, makeHandler(menu))
+		makeOptionsCallbackHandler(dialogStorage))
+	b.RegisterHandlerMatchFunc(messageMatchFunc, makeHandler(dialogStorage))
 	b.Start(ctx)
 }
 
@@ -65,12 +65,20 @@ func messageMatchFunc(update *models.Update) bool {
 	return update.Message != nil
 }
 
-func makeHandler(menu *command.MainMenu) bot.HandlerFunc {
+func makeHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
 		if update.Message == nil {
 			slog.Error("[bot.HandlerFunc]", "err", "message is nil")
 			return
 		}
+
+		customer := command.Customer(fmt.Sprint(update.Message.From.ID))
+		menu := ds.GetOrCreateMenu(customer, update.Message.Chat.ID)
+		if menu == nil {
+			slog.Error("[bot.HandlerFunc]", "err", "unexpected: menu == nil")
+			return
+		}
+
 		chctx := &chat.ChatContext{
 			Ctx:    ctx,
 			ChatID: update.Message.Chat.ID,
@@ -80,9 +88,10 @@ func makeHandler(menu *command.MainMenu) bot.HandlerFunc {
 			//According manual it is Unix time
 			Time:     time.Unix(int64(update.Message.Date), 0),
 			Text:     update.Message.Text,
-			Customer: fmt.Sprint(update.Message.From.ID),
+			Customer: customer,
 			//Choices: ,
 		}
+
 		err := menu.Process(r)
 		if err != nil {
 			slog.Error("[Handler:menu.Process]", "err", err.Error())
@@ -90,7 +99,7 @@ func makeHandler(menu *command.MainMenu) bot.HandlerFunc {
 	}
 }
 
-func makeOptionsCallbackHandler(menu *command.MainMenu) bot.HandlerFunc {
+func makeOptionsCallbackHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
 		// answering callback query first to let Telegram know that we received the callback query,
 		// and we're handling it. Otherwise, Telegram might retry sending the update repetitively
@@ -105,9 +114,16 @@ func makeOptionsCallbackHandler(menu *command.MainMenu) bot.HandlerFunc {
 		slog.Debug("[OptionsCallbackHandler]", "choice", update.CallbackQuery.Data,
 			"user", update.CallbackQuery.From.ID)
 
+		customer := command.Customer(fmt.Sprint(update.Message.From.ID))
+		dialog := ds.GetDialog(customer)
+		if dialog == nil {
+			slog.Error("[OptionsCallbackHandler]", "err", "dialog not found", "customer", customer)
+			return
+		}
+
 		chctx := &chat.ChatContext{
 			Ctx:    ctx,
-			ChatID: update.CallbackQuery.From.ID,
+			ChatID: dialog.ChatID,
 		}
 
 		var t time.Time
@@ -120,16 +136,15 @@ func makeOptionsCallbackHandler(menu *command.MainMenu) bot.HandlerFunc {
 
 		r := &command.Request{
 			ChatContext: chctx,
-			//According manual it is Unix time
-			Time: t,
+			Time:        t,
 			//Text:   ,
-			Customer: fmt.Sprint(update.CallbackQuery.From.ID),
+			Customer: customer,
 			Choices: []command.ChoiceID{
 				update.CallbackQuery.Data[len("slot_id_"):], //TODO move slot_id_ to bot package
 			},
 		}
 
-		err := menu.Process(r)
+		err := dialog.Menu.Process(r)
 		if err != nil {
 			slog.Error("[OptionsCallbackHandler:menu.Process]", "err", err.Error())
 		}

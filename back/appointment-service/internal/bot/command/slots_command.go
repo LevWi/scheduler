@@ -150,7 +150,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				}
 			}
 
-			err = sm.deps.Commands.Appointment.AddSlots(r.Ctx, r.Customer, tmpArray)
+			err = sm.deps.Commands.Appointment.AddSlots(r.Ctx, common.ID(r.Customer), tmpArray)
 			if err != nil {
 				return SlotSelectionResultContinue, err
 			}

@@ -25,6 +25,7 @@ type MenuDeps struct {
 	MM      messages.MessageMap
 }
 
+// TODO LangTag . seems it need to rework
 func (md *MenuDeps) SetLanguage(l string) error {
 	if md.LangTag != l {
 		md.Loc.SetLanguage(l)
