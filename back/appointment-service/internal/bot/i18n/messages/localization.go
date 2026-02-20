@@ -22,7 +22,7 @@ func NewLocalization(bundle *i18n.Bundle, langTag string) *Localization {
 	}
 }
 
-func (l *Localization) LangTag() string {
+func (l *Localization) Language() string {
 	return l.langTag
 }
 
@@ -33,6 +33,10 @@ func (l *Localization) SetLanguage(langTag string) {
 
 func (l *Localization) Localizer() *i18n.Localizer {
 	return i18n.NewLocalizer(l.bundle, l.langTag)
+}
+
+func (l *Localization) LocalizerFor(lang string) *i18n.Localizer {
+	return i18n.NewLocalizer(l.bundle, lang)
 }
 
 type DateFormatter interface {

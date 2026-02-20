@@ -9,7 +9,7 @@ import (
 
 type DialogsStorage struct {
 	mu         sync.RWMutex
-	md         *MenuDeps
+	depsProto  *MenuDeps
 	connection *bot.SchedulerConnection
 	//TODO do we need to combine Key As Customer+ChatID ?
 	dialogs map[Customer]*DialogValue
@@ -26,7 +26,7 @@ func NewDialogStorage(chat chat.Chat, l *messages.Localization, connection *bot.
 		return nil, err
 	}
 	return &DialogsStorage{
-		md:         deps,
+		depsProto:  deps,
 		connection: connection,
 		dialogs:    make(map[Customer]*DialogValue),
 	}, nil
@@ -42,8 +42,10 @@ func (ds *DialogsStorage) GetOrCreateMenu(ca Customer, ch chat.ChatID) *MainMenu
 	defer ds.mu.Unlock()
 	dialog = ds.dialogs[ca]
 	if dialog == nil || dialog.ChatID != ch {
+		clone := ds.depsProto.Clone()
 		dialog = &DialogValue{
-			Menu:   newMainMenu(ds.md, newDefaultSlotSelectionCommand(ds.md, ds.connection)),
+			//TODO can optimized for reducing SlotSelectionCommand copies
+			Menu:   newMainMenu(clone, newDefaultSlotSelectionCommand(clone, ds.connection)),
 			ChatID: ch,
 		}
 		ds.dialogs[ca] = dialog

@@ -19,41 +19,46 @@ const (
 )
 
 type MenuDeps struct {
-	LangTag string
-	Chat    *ChatAdapter
-	Loc     *messages.Localization
-	MM      messages.MessageMap
+	chat chat.Chat
+	Loc  *messages.Localization
+	MM   messages.MessageMap
+}
+
+func (md *MenuDeps) Chat() *ChatAdapter {
+	return NewChatAdapter(md.chat, md.Loc)
+}
+
+func (md *MenuDeps) Clone() *MenuDeps {
+	l := *md.Loc
+	return &MenuDeps{
+		chat: md.chat,
+		Loc:  &l,
+		MM:   md.MM,
+	}
 }
 
 // TODO LangTag . seems it need to rework
 func (md *MenuDeps) SetLanguage(l string) error {
-	if md.LangTag != l {
-		md.Loc.SetLanguage(l)
-		m, err := commandMap(md.Loc.Localizer())
+	if md.Loc.Language() != l {
+		m, err := commandMap(md.Loc.LocalizerFor(l))
 		if err != nil {
 			return err
 		}
 		md.MM = m
-		md.LangTag = l
-		md.Chat.Loc = md.Loc
+		md.Loc.SetLanguage(l)
 	}
 	return nil
 }
 
 func NewMenuDeps(ch chat.Chat, loc *messages.Localization) (*MenuDeps, error) {
-	ca := &ChatAdapter{
-		Chat: ch,
-		Loc:  loc,
-	}
 	m, err := commandMap(loc.Localizer())
 	if err != nil {
 		return nil, err
 	}
 	return &MenuDeps{
-			LangTag: loc.LangTag(),
-			Chat:    ca,
-			Loc:     loc,
-			MM:      m,
+			chat: ch,
+			Loc:  loc,
+			MM:   m,
 		},
 		nil
 }
@@ -76,11 +81,11 @@ type MainMenu struct {
 }
 
 func (menu *MainMenu) SetLanguage(l string) error {
-	return menu.SetLanguage(l)
+	return menu.menuDeps.SetLanguage(l)
 }
 
 func (menu *MainMenu) ShowHelp(c *chat.ChatContext) error {
-	return menu.menuDeps.Chat.PrintMessage(c, messages.HelpMessage)
+	return menu.menuDeps.Chat().PrintMessage(c, messages.HelpMessage)
 }
 
 // TODO fix case sensitive input
@@ -137,19 +142,12 @@ func (menu *MainMenu) Process(r *Request) error {
 }
 
 func (menu *MainMenu) showMessageForce(c *chat.ChatContext, msg *i18n.Message) error {
-	err := menu.menuDeps.Chat.PrintMessage(c, msg)
+	ch := menu.menuDeps.Chat()
+	err := ch.PrintMessage(c, msg)
 	if errors.Is(err, ErrLocalizeMessage) {
-		err = menu.menuDeps.Chat.Print(c, msg.One)
+		err = ch.Print(c, msg.One)
 	}
 	return err
-}
-
-func (menu *MainMenu) wrongUserInput(l *i18n.Localizer, c *chat.ChatContext) error {
-	s, err := l.LocalizeMessage(messages.WrongUserInput)
-	if err != nil {
-		s = messages.WrongUserInput.One
-	}
-	return errors.Join(err, menu.menuDeps.Chat.Print(c, s))
 }
 
 func (menu *MainMenu) BackToStart() {

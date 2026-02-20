@@ -15,13 +15,13 @@ import (
 
 type ChatAdapter struct {
 	chat.Chat
-	Loc *messages.Localization
+	loc *messages.Localization
 }
 
 func NewChatAdapter(chat chat.Chat, loc *messages.Localization) *ChatAdapter {
 	return &ChatAdapter{
 		Chat: chat,
-		Loc:  loc,
+		loc:  loc,
 	}
 }
 
@@ -33,7 +33,7 @@ const (
 var ErrLocalizeMessage = errors.New("localize message error")
 
 func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error {
-	l := ca.Loc.Localizer()
+	l := ca.loc.Localizer()
 	localized, err := l.LocalizeMessage(m)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrLocalizeMessage, err)
@@ -42,7 +42,7 @@ func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error 
 }
 
 func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, ops []*i18n.Message) error {
-	l := ca.Loc.Localizer()
+	l := ca.loc.Localizer()
 	localized, err := messages.LocalizeMessages(l, ops)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
 	}
 
-	localized, err := ca.Loc.Localizer().LocalizeMessage(me)
+	localized, err := ca.loc.Localizer().LocalizeMessage(me)
 	if err != nil {
 		return err
 	}

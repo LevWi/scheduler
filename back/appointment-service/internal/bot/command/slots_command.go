@@ -66,7 +66,7 @@ var todo = &i18n.Message{
 func (sm *SlotSelectionCommand) ShowRangesMenu(c *chat.ChatContext, additional ...*i18n.Message) error {
 	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek}
 	options = append(options, additional...)
-	return sm.deps.MD.Chat.ShowMenuMessages(c, todo, options)
+	return sm.deps.MD.Chat().ShowMenuMessages(c, todo, options)
 }
 
 func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
@@ -92,7 +92,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 			return SlotSelectionResultNotSet, err
 		}
 		sm.availableSlots = ToLabeledSlot(slots)
-		return SlotSelectionResultContinue, sm.deps.MD.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
+		return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 	} else {
 		if r.Text != "" {
 			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
@@ -128,7 +128,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				}
 			}
 			sm.availableSlots = tmpArray
-			return SlotSelectionResultContinue, sm.deps.MD.Chat.ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
+			return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 		case strings.HasPrefix(r.Choices[0], SlotMarker):
 			//TODO need logic for multiple slot choices
 			if len(r.Choices) != 1 {
@@ -155,7 +155,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				return SlotSelectionResultContinue, err
 			}
 
-			return SlotSelectionResultDone, sm.deps.MD.Chat.PrintMessage(r.ChatContext, messages.Done)
+			return SlotSelectionResultDone, sm.deps.MD.Chat().PrintMessage(r.ChatContext, messages.Done)
 		default:
 			return SlotSelectionResultContinue, fmt.Errorf("%w: unexpected ChoiceType (%v)",
 				common.ErrInvalidArgument, r.Choices[0])
