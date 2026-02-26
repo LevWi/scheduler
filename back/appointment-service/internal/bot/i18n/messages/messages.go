@@ -9,48 +9,48 @@ var AvailableSlots = &i18n.Message{
 }
 
 var ThisWeek = &i18n.Message{
-	ID:  "ThisWeek",
-	One: "This week",
+	ID:    "ThisWeek",
+	Other: "This week",
 }
 
 var NextWeek = &i18n.Message{
-	ID:  "NextWeek",
-	One: "Next week",
+	ID:    "NextWeek",
+	Other: "Next week",
 }
 
 var Cancel = &i18n.Message{
-	ID:  "Cancel",
-	One: "Cancel",
+	ID:    "Cancel",
+	Other: "Cancel",
 }
 
 var Done = &i18n.Message{
-	ID:  "Done",
-	One: "Done",
+	ID:    "Done",
+	Other: "Done",
 }
 
 var Help = &i18n.Message{
-	ID:  "Help",
-	One: "Help",
+	ID:    "Help",
+	Other: "Help",
 }
 
 var BookSlot = &i18n.Message{
-	ID:  "BookSlot",
-	One: "Book a slot",
+	ID:    "BookSlot",
+	Other: "Book a slot",
 }
 
 var WrongUserInput = &i18n.Message{
-	ID:  "WrongUserInput",
-	One: "Input text is unexpected",
+	ID:    "WrongUserInput",
+	Other: "Input text is unexpected",
 }
 
 var InternalErrorOccurred = &i18n.Message{
-	ID:  "InternalErrorOccurred",
-	One: "Internal error occurred",
+	ID:    "InternalErrorOccurred",
+	Other: "Internal error occurred",
 }
 
 var HelpMessage = &i18n.Message{
-	ID:  "HelpMessage",
-	One: "TODO: Add big help message here",
+	ID:    "HelpMessage",
+	Other: "TODO: Add big help message here",
 }
 
 type MessageConstant = i18n.Message

@@ -58,8 +58,8 @@ const (
 
 // TODO remove it. Only for skeleton
 var todo = &i18n.Message{
-	ID:  "TBD",
-	One: "TBD",
+	ID:    "TBD",
+	Other: "TBD",
 }
 
 // TODO write here or in MainMenu?

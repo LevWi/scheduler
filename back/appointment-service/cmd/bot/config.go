@@ -23,7 +23,8 @@ func (c *BotConfig) Validate() error {
 	if c.SchedulerAPI.Token == "" {
 		return errors.New("scheduler_api token is not set")
 	}
-	return nil
+
+	return c.SchedulerAPI.Validate()
 }
 
 func LoadBotConfig() (*BotConfig, error) {
