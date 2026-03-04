@@ -7,6 +7,7 @@ import (
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
+	"strings"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
@@ -91,10 +92,15 @@ func (menu *MainMenu) ShowHelp(c *chat.ChatContext) error {
 // TODO fix case sensitive input
 // TODO need user time zone setting
 func (menu *MainMenu) Process(r *Request) error {
+	r.Text = strings.ToLower(r.Text)
 	c := menu.menuDeps.MM.IdentifyMessage(r.Text)
 
+	if r.Text == "/start" {
+		c = messages.Cancel
+	}
+
 	if c == messages.Cancel {
-		menu.BackToStart()
+		menu.BackToStart(r.ChatContext)
 		//TODO print main menu
 		return menu.ShowHelp(r.ChatContext)
 	}
@@ -104,7 +110,7 @@ func (menu *MainMenu) Process(r *Request) error {
 		if c == messages.BookSlot {
 			err := menu.slotCommands.ShowRangesMenu(r.ChatContext, messages.Cancel)
 			if err != nil {
-				slog.ErrorContext(r.Ctx, "mainMenu menuStart", "err", err.Error())
+				slog.ErrorContext(r.Ctx, "mainMenu.menuStart", "err", err.Error())
 				return err
 			}
 			menu.state = menuSlotSelection
@@ -122,15 +128,14 @@ func (menu *MainMenu) Process(r *Request) error {
 				return menu.showMessageForce(r.ChatContext, messages.WrongUserInput)
 			} else {
 				slog.ErrorContext(r.Ctx, "mainMenu menuSlotSelection process", "err", err.Error())
-				menu.BackToStart()
-
-				return menu.showMessageForce(r.ChatContext, messages.InternalErrorOccurred)
+				return errors.Join(menu.showMessageForce(r.ChatContext, messages.InternalErrorOccurred),
+					menu.BackToStart(r.ChatContext))
 			}
 		}
 
 		switch result {
 		case SlotSelectionResultDone:
-			menu.state = menuStart
+			return menu.BackToStart(r.ChatContext)
 		case SlotSelectionResultNotSet:
 			slog.ErrorContext(r.Ctx, "mainMenu menuSlotSelection unexpected result")
 			return common.ErrInternal
@@ -150,9 +155,16 @@ func (menu *MainMenu) showMessageForce(c *chat.ChatContext, msg *i18n.Message) e
 	return err
 }
 
-func (menu *MainMenu) BackToStart() {
+func (menu *MainMenu) BackToStart(c *chat.ChatContext) error {
 	menu.state = menuStart
 	menu.slotCommands.Cancel()
+	options := []*i18n.Message{messages.BookSlot, messages.Help, messages.Cancel}
+	err := menu.menuDeps.Chat().ShowMenuMessages(c, todo, options)
+	if err != nil {
+		slog.ErrorContext(c.Ctx, "mainMenu.BackToStart", "err", err.Error())
+		return err
+	}
+	return nil
 }
 
 func newMainMenu(md *MenuDeps, slotCommands *SlotSelectionCommand) *MainMenu {

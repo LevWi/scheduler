@@ -1,6 +1,10 @@
 package messages
 
-import "github.com/nicksnyder/go-i18n/v2/i18n"
+import (
+	"strings"
+
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+)
 
 var AvailableSlots = &i18n.Message{
 	ID:    "AvailableSlots",
@@ -43,6 +47,11 @@ var WrongUserInput = &i18n.Message{
 	Other: "Input text is unexpected",
 }
 
+var NoSlotsAvailable = &i18n.Message{
+	ID:    "NoSlotsFound",
+	Other: "No slots available",
+}
+
 var InternalErrorOccurred = &i18n.Message{
 	ID:    "InternalErrorOccurred",
 	Other: "Internal error occurred",
@@ -67,6 +76,7 @@ func LocalizedMessageMap(l *i18n.Localizer, ms ...*i18n.Message) (MessageMap, er
 		if err != nil {
 			return nil, err
 		}
+		text = strings.ToLower(text)
 		out[text] = m
 	}
 	return out, nil

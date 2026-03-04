@@ -91,6 +91,11 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 		if err != nil {
 			return SlotSelectionResultNotSet, err
 		}
+
+		if len(slots) == 0 {
+			return SlotSelectionResultContinue, sm.deps.MD.Chat().PrintMessage(r.ChatContext, messages.NoSlotsAvailable)
+		}
+
 		sm.availableSlots = ToLabeledSlot(slots)
 		return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
 	} else {
@@ -141,12 +146,12 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				return SlotSelectionResultNotSet, fmt.Errorf("%w: for %v", err, idxStr)
 			}
 
-			tmpArray := make([]common.Slot, len(r.Choices))
-			tmpPrint := make([]LabeledSlot, len(r.Choices))
+			tmpArray := make([]common.Slot, 0, len(r.Choices))
+			//tmpPrint := make([]LabeledSlot, 0, len(r.Choices))
 			for _, slot := range sm.availableSlots {
 				if slot.ID == id {
 					tmpArray = append(tmpArray, slot.Slot)
-					tmpPrint = append(tmpPrint, slot)
+					//tmpPrint = append(tmpPrint, slot)
 				}
 			}
 

@@ -56,7 +56,7 @@ func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, op
 }
 
 func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops []LabeledSlot) error {
-	if len(ops) < 2 {
+	if len(ops) == 0 {
 		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
 	}
 

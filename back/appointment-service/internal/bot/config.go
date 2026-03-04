@@ -1,6 +1,10 @@
 package bot
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"net/url"
+)
 
 // TODO For slots GET request is no auth required. So business_id used in request only here.
 // Ether we need to set BusinessID in config (but it strongly should corresponding
@@ -16,6 +20,8 @@ type SchedulerConnection struct {
 func (s *SchedulerConnection) Validate() error {
 	if s.URL == "" {
 		return errors.New("scheduler url is not set")
+	} else if _, err := url.Parse(s.URL); err != nil {
+		return fmt.Errorf("config check error: %w", err)
 	}
 	if s.BusinessID == "" {
 		return errors.New("scheduler business_id is not set")

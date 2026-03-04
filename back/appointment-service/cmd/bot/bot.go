@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/chat/telegram"
 	"scheduler/appointment-service/internal/bot/command"
@@ -21,6 +22,7 @@ import (
 	"golang.org/x/text/language"
 )
 
+// TODO we need somehow to split available time intervals to small slots...
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -30,6 +32,12 @@ func main() {
 		slog.Error("[LoadBotConfig]", "err", err.Error())
 		log.Fatal(err)
 	}
+
+	slogOpts := &slog.HandlerOptions{
+		Level: cfg.LogLevel,
+	}
+	logger := common.NewLoggerWithCtxHandler(slog.NewTextHandler(os.Stdout, slogOpts))
+	slog.SetDefault(logger)
 
 	opts := []bot.Option{bot.WithDebug()} //TODO
 
@@ -101,10 +109,6 @@ func makeHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 
 func makeOptionsCallbackHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-		// answering callback query first to let Telegram know that we received the callback query,
-		// and we're handling it. Otherwise, Telegram might retry sending the update repetitively
-		// as it thinks the callback query doesn't reach to our application. learn more by
-		// reading the footnote of the https://core.telegram.org/bots/api#callbackquery type.
 		//TODO show some message to user if error?
 		b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: update.CallbackQuery.ID,
@@ -114,7 +118,7 @@ func makeOptionsCallbackHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 		slog.Debug("[OptionsCallbackHandler]", "choice", update.CallbackQuery.Data,
 			"user", update.CallbackQuery.From.ID)
 
-		customer := command.Customer(fmt.Sprint(update.Message.From.ID))
+		customer := command.Customer(fmt.Sprint(update.CallbackQuery.From.ID))
 		dialog := ds.GetDialog(customer)
 		if dialog == nil {
 			slog.Error("[OptionsCallbackHandler]", "err", "dialog not found", "customer", customer)
