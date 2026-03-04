@@ -29,6 +29,7 @@ func (slot dbBusySlot) ToSlot() common.BusySlot {
 	}
 }
 
+// TODO connect it with IntervalRRuleWithType
 type DBRule = string
 
 type DbBusinessRule struct {
@@ -47,7 +48,7 @@ func (db *TimeSlotsStorage) GetBusinessRules(business_id common.ID) ([]DbBusines
 	return rules, nil
 }
 
-// TODO check that rule valid ?
+// TODO better to receive correct struct instead of string. Need fix
 // TODO return business rule id ?
 func (db *TimeSlotsStorage) AddBusinessRule(businessID string, rule DBRule) error {
 	newID := uuid.New().String()

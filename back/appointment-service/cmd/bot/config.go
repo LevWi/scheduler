@@ -11,7 +11,6 @@ type BotConfig struct {
 	BotAPIConnection string                  `cfg:"bot_api_connection"`
 	LogLevel         slog.Level              `cfg:"log_level"`
 	SchedulerAPI     bot.SchedulerConnection `cfg:"scheduler"`
-	//TODO business_id?
 }
 
 func (c *BotConfig) Validate() error {
@@ -24,7 +23,8 @@ func (c *BotConfig) Validate() error {
 	if c.SchedulerAPI.Token == "" {
 		return errors.New("scheduler_api token is not set")
 	}
-	return nil
+
+	return c.SchedulerAPI.Validate()
 }
 
 func LoadBotConfig() (*BotConfig, error) {

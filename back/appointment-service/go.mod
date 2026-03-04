@@ -3,7 +3,9 @@ module scheduler/appointment-service
 go 1.23.0
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/MicahParks/jwkset v0.9.6
+	github.com/go-telegram/bot v1.17.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/uuid v1.6.0
@@ -15,11 +17,13 @@ require (
 	github.com/knadh/koanf/providers/file v1.2.0
 	github.com/knadh/koanf/v2 v2.3.0
 	github.com/mattn/go-sqlite3 v1.14.23
+	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.11.1
 	github.com/teambition/rrule-go v1.8.2
 	golang.org/x/crypto v0.39.0
 	golang.org/x/oauth2 v0.30.0
+	golang.org/x/text v0.26.0
 	golang.org/x/time v0.12.0
 )
 

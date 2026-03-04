@@ -47,5 +47,7 @@ func (l *LimitsTable[Key]) SetProducer(p RequestLimitUpdate) {
 }
 
 func NewLimitsTable[Key comparable](p RequestLimitUpdate) *LimitsTable[Key] {
-	return &LimitsTable[Key]{producer: p}
+	return &LimitsTable[Key]{
+		m:        make(map[Key]*rate.Limiter),
+		producer: p}
 }
