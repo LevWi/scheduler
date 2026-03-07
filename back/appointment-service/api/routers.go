@@ -168,26 +168,25 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 }
 
 func (a *api) addBusinessRulesHandlers(r *mux.Router) {
-	ruleStorage := rruleStorage{a.storages.TimeSlots}
 	addRoutes(
 		r,
 		Route{
 			"AddBusinessRulePost",
 			"POST",
 			"/rrules",
-			AuthHandler(a.cookieAuth, AddBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, AddBusinessRuleHandler(a.storages.TimeSlots), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"GetBusinessRule",
 			"GET",
 			"/rrules",
-			AuthHandler(a.cookieAuth, GetBusinessRulesHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, GetBusinessRulesHandler(a.storages.TimeSlots), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
 			"DelBusinessRule",
 			"DELETE",
 			"/rrules/{id}",
-			AuthHandler(a.cookieAuth, DelBusinessRuleHandler(&ruleStorage), http.HandlerFunc(LoginRequired)),
+			AuthHandler(a.cookieAuth, DelBusinessRuleHandler(a.storages.TimeSlots), http.HandlerFunc(LoginRequired)),
 		})
 }
 

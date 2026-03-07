@@ -79,7 +79,7 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 		i := 0
 		for k := range m {
 			chatOptions[i].ID = fmt.Sprintf("%s%s", DayMarker, k)
-			chatOptions[i].Text = k //TODO need Localization here
+			chatOptions[i].Text = k //TODO need Localization here (https://github.com/LevWi/scheduler/issues/18)
 			i++
 		}
 	} else {

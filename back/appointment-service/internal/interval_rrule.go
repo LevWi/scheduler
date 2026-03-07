@@ -19,6 +19,20 @@ func (d Seconds) Duration() time.Duration {
 	return time.Duration(d) * time.Second
 }
 
+func (a IntervalRRule) Equal(b IntervalRRule) bool {
+	if a.Len != b.Len {
+		return false
+	}
+
+	if a.RRule == nil || b.RRule == nil {
+		return a.RRule == b.RRule
+	} else if a.RRule == b.RRule {
+		return true
+	}
+
+	return a.RRule.String() == b.RRule.String()
+}
+
 func (r IntervalRRule) GetIntervals() Intervals {
 	next := r.RRule.Iterator()
 	result := Intervals{}
@@ -104,6 +118,10 @@ type IntervalRRuleWithType struct {
 	Type IntervalType
 }
 
+func (v1 IntervalRRuleWithType) Equal(v2 IntervalRRuleWithType) bool {
+	return v1.Rule.Equal(v2.Rule) && v1.Type == v2.Type
+}
+
 func CalculateIntervals(in []IntervalRRuleWithType) Intervals {
 	var inclusion Intervals
 	var exclusion Intervals
@@ -123,18 +141,4 @@ func CalculateIntervals(in []IntervalRRuleWithType) Intervals {
 	PrepareUnited(exclusion)
 
 	return inclusion.PassedIntervals(exclusion)
-}
-
-// TODO remove?
-func ConvertToIntervalRRuleWithType(jsonStrings []string) ([]IntervalRRuleWithType, error) {
-	var intervalsRRules []IntervalRRuleWithType
-	for _, el := range jsonStrings {
-		var tmp IntervalRRuleWithType
-		err := json.Unmarshal([]byte(el), &tmp)
-		if err != nil {
-			return nil, err
-		}
-		intervalsRRules = append(intervalsRRules, tmp)
-	}
-	return intervalsRRules, nil
 }

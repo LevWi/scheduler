@@ -46,7 +46,8 @@ func (a *HttpAppointment) AddSlots(ctx context.Context, customer common.ID, slot
 	q.Add("customer_id", customer)
 	req.URL.RawQuery = q.Encode()
 
-	//TODO with timeout?
+	// TODO with timeout
+	// https://github.com/LevWi/scheduler/issues/19
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
