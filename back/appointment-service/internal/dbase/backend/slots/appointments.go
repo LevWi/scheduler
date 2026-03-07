@@ -107,7 +107,7 @@ func (db *TimeSlotsStorage) GetAvailableSlotsInRange(business_id common.ID, betw
 
 	intervalsRRules, err := common.MapE(jsonRules, func(in string) (common.IntervalRRuleWithType, error) {
 		var tmp common.IntervalRRuleWithType
-		err := json.Unmarshal([]byte(in), &tmp.Rule)
+		err := json.Unmarshal([]byte(in), &tmp)
 		if err != nil {
 			return common.IntervalRRuleWithType{}, err
 		}
