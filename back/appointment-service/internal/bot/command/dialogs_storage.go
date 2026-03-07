@@ -11,8 +11,7 @@ type DialogsStorage struct {
 	mu         sync.RWMutex
 	depsProto  *MenuDeps
 	connection *bot.SchedulerConnection
-	//TODO do we need to combine Key As Customer+ChatID ?
-	dialogs map[Customer]*DialogValue
+	dialogs    map[Customer]*DialogValue
 }
 
 type DialogValue struct {
@@ -44,7 +43,6 @@ func (ds *DialogsStorage) GetOrCreateMenu(ca Customer, ch chat.ChatID) *MainMenu
 	if dialog == nil || dialog.ChatID != ch {
 		clone := ds.depsProto.Clone()
 		dialog = &DialogValue{
-			//TODO can optimized for reducing SlotSelectionCommand copies
 			Menu:   newMainMenu(clone, newDefaultSlotSelectionCommand(clone, ds.connection)),
 			ChatID: ch,
 		}

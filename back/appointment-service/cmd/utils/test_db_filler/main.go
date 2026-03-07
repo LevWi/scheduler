@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -96,12 +95,7 @@ func main() {
 		Type: common.Inclusion,
 	}
 
-	strRule, err := json.Marshal(rule)
-	if err != nil {
-		Fatal(err)
-	}
-
-	err = slts.AddBusinessRule(userId, string(strRule))
+	_, err = slts.AddBusinessRule(userId, rule)
 	if err != nil {
 		Fatal(err)
 	}
@@ -113,5 +107,5 @@ func main() {
 	PrintVar("botID", botID)
 	PrintVar("botToken", botToken)
 	PrintVar("botInfo", botInfo)
-	PrintVar("Rule", string(strRule))
+	PrintVar("Rule", rule)
 }

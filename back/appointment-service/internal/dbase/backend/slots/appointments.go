@@ -1,6 +1,7 @@
 package slots
 
 import (
+	"encoding/json"
 	common "scheduler/appointment-service/internal"
 	"time"
 
@@ -29,35 +30,63 @@ func (slot dbBusySlot) ToSlot() common.BusySlot {
 	}
 }
 
-// TODO connect it with IntervalRRuleWithType
-type DBRule = string
+type RuleID = string
 
 type DbBusinessRule struct {
-	Id   string
-	Rule DBRule
+	Id   RuleID
+	Rule common.IntervalRRuleWithType
+}
+
+type dbJsonBusinessRule struct {
+	Id   RuleID
+	Rule string
+}
+
+func ConvertSlice(in []dbJsonBusinessRule) ([]DbBusinessRule, error) {
+	var intervalsRRules []DbBusinessRule
+	for _, el := range in {
+		var tmp DbBusinessRule
+		err := json.Unmarshal([]byte(el.Rule), &tmp.Rule)
+		if err != nil {
+			return nil, err
+		}
+		tmp.Id = el.Id
+		intervalsRRules = append(intervalsRRules, tmp)
+	}
+	return intervalsRRules, nil
 }
 
 func (db *TimeSlotsStorage) GetBusinessRules(business_id common.ID) ([]DbBusinessRule, error) {
-	var rules []DbBusinessRule
-	err := db.Select(&rules, "SELECT id, rule FROM business_work_rule WHERE business_id = $1",
-		string(business_id))
+	var rules []dbJsonBusinessRule
+	err := db.Select(&rules, "SELECT id, rule FROM business_work_rule WHERE business_id = $1", string(business_id))
 	if err != nil {
 		return nil, err
 	}
 
-	return rules, nil
+	return common.MapE(rules, func(in dbJsonBusinessRule) (DbBusinessRule, error) {
+		var tmp DbBusinessRule
+		err := json.Unmarshal([]byte(in.Rule), &tmp.Rule)
+		if err != nil {
+			return DbBusinessRule{}, err
+		}
+		tmp.Id = in.Id
+		return tmp, nil
+	})
 }
 
-// TODO better to receive correct struct instead of string. Need fix
-// TODO return business rule id ?
-func (db *TimeSlotsStorage) AddBusinessRule(businessID string, rule DBRule) error {
+func (db *TimeSlotsStorage) AddBusinessRule(businessID string, rule common.IntervalRRuleWithType) (RuleID, error) {
+	b, err := json.Marshal(rule)
+	if err != nil {
+		return "", err
+	}
+
 	newID := uuid.New().String()
 
-	_, err := db.Exec(`
+	_, err = db.Exec(`
 		INSERT INTO business_work_rule (id, business_id, rule)
 		VALUES ($1, $2, $3)
-	`, newID, businessID, rule)
-	return err
+	`, newID, businessID, string(b))
+	return newID, err
 }
 
 // TODO is value deletion confirm needed?
@@ -70,13 +99,20 @@ func (db *TimeSlotsStorage) DeleteBusinessRule(business_id common.ID, id string)
 
 // TODO add test
 func (db *TimeSlotsStorage) GetAvailableSlotsInRange(business_id common.ID, between common.Interval) (common.Intervals, error) {
-	var rules []DBRule
-	err := db.Select(&rules, "SELECT rule FROM business_work_rule WHERE business_id = $1", string(business_id))
+	var jsonRules []string
+	err := db.Select(&jsonRules, "SELECT rule FROM business_work_rule WHERE business_id = $1", string(business_id))
 	if err != nil {
 		return nil, err
 	}
 
-	intervalsRRules, err := common.ConvertToIntervalRRuleWithType(rules)
+	intervalsRRules, err := common.MapE(jsonRules, func(in string) (common.IntervalRRuleWithType, error) {
+		var tmp common.IntervalRRuleWithType
+		err := json.Unmarshal([]byte(in), &tmp)
+		if err != nil {
+			return common.IntervalRRuleWithType{}, err
+		}
+		return tmp, nil
+	})
 	if err != nil {
 		return nil, err
 	}

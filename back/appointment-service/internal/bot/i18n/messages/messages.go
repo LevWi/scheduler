@@ -57,6 +57,7 @@ var InternalErrorOccurred = &i18n.Message{
 	Other: "Internal error occurred",
 }
 
+// TODO https://github.com/LevWi/scheduler/issues/21
 var HelpMessage = &i18n.Message{
 	ID:    "HelpMessage",
 	Other: "TODO: Add big help message here",
