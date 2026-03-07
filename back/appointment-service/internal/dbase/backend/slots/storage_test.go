@@ -2,17 +2,19 @@ package slots
 
 import (
 	"fmt"
+	"math/rand"
 	"slices"
-	"strconv"
 	"testing"
 	"time"
 
-	types "scheduler/appointment-service/internal"
+	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/dbase/test"
+
+	"github.com/teambition/rrule-go"
 )
 
-func toInterval(start time.Time, end time.Time) types.Interval {
-	return types.Interval{Start: start, End: end}
+func toInterval(start time.Time, end time.Time) common.Interval {
+	return common.Interval{Start: start, End: end}
 }
 
 func TestStorage(t *testing.T) {
@@ -24,12 +26,12 @@ func TestStorage(t *testing.T) {
 		appointments = append(appointments, AddSlotsData{
 			Business: "b1",
 			Customer: "c1",
-			Slots: []types.Interval{
+			Slots: []common.Interval{
 				{Start: tm, End: tm.Add(30 * time.Minute)}},
 		}, AddSlotsData{
 			Business: "b1",
 			Customer: "c2",
-			Slots: []types.Interval{
+			Slots: []common.Interval{
 				{Start: tm.Add(30 * time.Minute), End: tm.Add(60 * time.Minute)}},
 		})
 	}
@@ -86,50 +88,87 @@ func TestStorageBusinessRule(t *testing.T) {
 
 	const businessName = "Business Name"
 	const rulesCount = 100
+
+	rules := make([]DbBusinessRule, rulesCount)
+
 	for x := range rulesCount {
-		err := storage.AddBusinessRule(businessName, "some_rule"+strconv.Itoa(x))
+		randI := rand.Int()
+		ruleType := common.Exclusion
+		if randI%2 == 1 {
+			ruleType = common.Inclusion
+		}
+
+		rr, err := rrule.NewRRule(
+			rrule.ROption{
+				Dtstart: time.Now(),
+				Freq:    rrule.DAILY,
+				Count:   randI % 100,
+			})
+
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		r := DbBusinessRule{
+			Rule: common.IntervalRRuleWithType{
+				Rule: common.IntervalRRule{
+					RRule: rr,
+					Len:   common.Seconds(randI % (60 * 60)),
+				},
+				Type: ruleType,
+			},
+		}
+
+		ruleID, err := storage.AddBusinessRule(businessName, r.Rule)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Id = ruleID
+
+		rules[x] = r
 	}
 
 	var count int
-	err := storage.Get(&count, "SELECT COUNT(*) FROM business_work_rule WHERE rule = \"some_rule42\"")
+	err := storage.Get(&count, "SELECT COUNT(*) FROM business_work_rule")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
+	if count != rulesCount {
 		t.Fatal("unexpect count: ", count)
 	}
 
-	rules, err := storage.GetBusinessRules(businessName)
+	rulesGet, err := storage.GetBusinessRules(businessName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rules) != rulesCount {
-		t.Fatal("unexpect rules count: ", len(rules))
+	if len(rulesGet) != rulesCount {
+		t.Fatal("unexpect rules count: ", len(rulesGet))
 	}
 
 	for i, r := range rules {
-		if r.Rule != "some_rule"+strconv.Itoa(i) {
-			t.Fatal("unexpect rule: ", r.Rule)
+		if r.Id != rulesGet[i].Id || !r.Rule.Equal(rulesGet[i].Rule) {
+			t.Fatalf("unexpect rule[%d]: %v", i, rulesGet[i])
 		}
 	}
 
-	err = storage.DeleteBusinessRule(businessName, rules[42].Id)
+	const index = 42
+	deletedRule := rules[index]
+	err = storage.DeleteBusinessRule(businessName, deletedRule.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rules, err = storage.GetBusinessRules(businessName)
+	rulesGet, err = storage.GetBusinessRules(businessName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rules) != rulesCount-1 {
+	if len(rulesGet) != rulesCount-1 {
 		t.Fatal("unexpect rules count: ", len(rules))
 	}
 
-	if slices.ContainsFunc(rules, func(r DbBusinessRule) bool { return r.Rule == "some_rule42" }) {
+	if slices.ContainsFunc(rulesGet, func(r DbBusinessRule) bool {
+		return r.Rule == deletedRule.Rule || r.Id == deletedRule.Id
+	}) {
 		t.Fatal("rule should be deleted")
 	}
 }

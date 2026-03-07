@@ -89,8 +89,7 @@ func (menu *MainMenu) ShowHelp(c *chat.ChatContext) error {
 	return menu.menuDeps.Chat().PrintMessage(c, messages.HelpMessage)
 }
 
-// TODO fix case sensitive input
-// TODO need user time zone setting
+// TODO need user time zone setting (https://github.com/LevWi/scheduler/issues/17)
 func (menu *MainMenu) Process(r *Request) error {
 	r.Text = strings.ToLower(r.Text)
 	c := menu.menuDeps.MM.IdentifyMessage(r.Text)
@@ -101,7 +100,6 @@ func (menu *MainMenu) Process(r *Request) error {
 
 	if c == messages.Cancel {
 		menu.BackToStart(r.ChatContext)
-		//TODO print main menu
 		return menu.ShowHelp(r.ChatContext)
 	}
 

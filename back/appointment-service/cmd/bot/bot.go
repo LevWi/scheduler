@@ -22,7 +22,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-// TODO we need somehow to split available time intervals to small slots...
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()

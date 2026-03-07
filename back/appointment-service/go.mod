@@ -16,7 +16,7 @@ require (
 	github.com/knadh/koanf/providers/env/v2 v2.0.0
 	github.com/knadh/koanf/providers/file v1.2.0
 	github.com/knadh/koanf/v2 v2.3.0
-	github.com/mattn/go-sqlite3 v1.14.23
+	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.11.1
