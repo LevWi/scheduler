@@ -157,7 +157,7 @@ func (menu *MainMenu) BackToStart(c *chat.ChatContext) error {
 	menu.state = menuStart
 	menu.slotCommands.Cancel()
 	options := []*i18n.Message{messages.BookSlot, messages.Help, messages.Cancel}
-	err := menu.menuDeps.Chat().ShowMenuMessages(c, todo, options)
+	err := menu.menuDeps.Chat().ShowMenuMessages(c, messages.CommandRequestMessage, options)
 	if err != nil {
 		slog.ErrorContext(c.Ctx, "mainMenu.BackToStart", "err", err.Error())
 		return err
