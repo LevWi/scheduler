@@ -56,17 +56,11 @@ const (
 	SlotSelectionResultDone
 )
 
-// TODO remove it. Only for skeleton
-var todo = &i18n.Message{
-	ID:    "TBD",
-	Other: "TBD",
-}
-
 // TODO write here or in MainMenu?
 func (sm *SlotSelectionCommand) ShowRangesMenu(c *chat.ChatContext, additional ...*i18n.Message) error {
 	options := []*i18n.Message{messages.NextWeek, messages.ThisWeek}
 	options = append(options, additional...)
-	return sm.deps.MD.Chat().ShowMenuMessages(c, todo, options)
+	return sm.deps.MD.Chat().ShowMenuMessages(c, messages.SelectRequestMessage, options)
 }
 
 func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error) {
@@ -97,7 +91,8 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 		}
 
 		sm.availableSlots = ToLabeledSlot(slots)
-		return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
+		return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext,
+			messages.SelectRequestMessage, sm.availableSlots)
 	} else {
 		if r.Text != "" {
 			return SlotSelectionResultContinue, fmt.Errorf("%w: input text should be empty", ErrWrongUserInput)
@@ -133,7 +128,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 				}
 			}
 			sm.availableSlots = tmpArray
-			return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext, todo, sm.availableSlots)
+			return SlotSelectionResultContinue, sm.deps.MD.Chat().ShowAsOptions(r.ChatContext, messages.SelectRequestMessage, sm.availableSlots)
 		case strings.HasPrefix(r.Choices[0], SlotMarker):
 			//TODO need logic for multiple slot choices
 			if len(r.Choices) != 1 {

@@ -39,7 +39,7 @@ var Help = &i18n.Message{
 
 var BookSlot = &i18n.Message{
 	ID:    "BookSlot",
-	Other: "Book a slot",
+	Other: "book a slot",
 }
 
 var WrongUserInput = &i18n.Message{
@@ -57,10 +57,26 @@ var InternalErrorOccurred = &i18n.Message{
 	Other: "Internal error occurred",
 }
 
-// TODO https://github.com/LevWi/scheduler/issues/21
 var HelpMessage = &i18n.Message{
-	ID:    "HelpMessage",
-	Other: "TODO: Add big help message here",
+	ID: "HelpMessage",
+	Other: `Available commands:
+"help" - Show this help message
+"book a slot"   - Book a slot for an appointment
+"cancel" - Cancel current operation or booking
+Use special button or type it
+`,
+}
+
+// TODO remove it. Only for skeleton
+var SelectRequestMessage = &i18n.Message{
+	ID:    "SelectRequestMessage",
+	Other: "Please select an option",
+}
+
+var CommandRequestMessage = &i18n.Message{
+	ID: "CommandRequestMessage",
+	Other: `Please type or select an command
+	(try "help" for more info)`,
 }
 
 type MessageConstant = i18n.Message
