@@ -1,11 +1,13 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	swagger "scheduler/appointment-service/api/types"
@@ -14,6 +16,12 @@ import (
 	slotsdb "scheduler/appointment-service/internal/dbase/backend/slots"
 
 	"github.com/gorilla/mux"
+)
+
+const (
+	fallbackDefaultBookingSlotChunk = 15 * time.Minute
+	fallbackMaxBookingSlotChunk     = 1 * time.Hour
+	minBookingSlotChunk             = 5 * time.Minute
 )
 
 func parseTime(s string) (time.Time, error) {
@@ -31,6 +39,25 @@ func getTimeFromURL(key string, v url.Values) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return dt, nil
+}
+
+func getSlotChunkFromURL(v url.Values, defaults slotsdb.BusinessSlotSettings) (time.Duration, error) {
+	chunkMinutesStr := v.Get("chunk_minutes")
+	if chunkMinutesStr == "" {
+		return defaults.DefaultChunk, nil
+	}
+
+	chunkMinutes, err := strconv.Atoi(chunkMinutesStr)
+	if err != nil {
+		return 0, fmt.Errorf("chunk_minutes invalid")
+	}
+
+	chunk := time.Duration(chunkMinutes) * time.Minute
+	if chunk < minBookingSlotChunk || chunk > defaults.MaxChunk {
+		return 0, fmt.Errorf("chunk_minutes out of range")
+	}
+
+	return chunk, nil
 }
 
 // TODO add lock?
@@ -60,12 +87,34 @@ func (a *api) SlotsBusinessIdGetFunc() http.HandlerFunc {
 			return
 		}
 
+		chunkSettings, err := a.storages.TimeSlots.GetBusinessSlotSettings(businessID)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				slog.WarnContext(r.Context(), err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			chunkSettings = slotsdb.BusinessSlotSettings{
+				DefaultChunk: fallbackDefaultBookingSlotChunk,
+				MaxChunk:     fallbackMaxBookingSlotChunk,
+			}
+		}
+
+		slotChunk, err := getSlotChunkFromURL(query, chunkSettings)
+		if err != nil {
+			slog.WarnContext(r.Context(), err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		slots, err := a.storages.TimeSlots.GetAvailableSlotsInRange(businessID, common.Interval{Start: dateStart, End: dateEnd})
 		if err != nil {
 			slog.WarnContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		slots = common.ChunkIntervals(slots, slotChunk)
 
 		var response swagger.AvailableSlots
 		response.QueryId = r.Context().Value(RequestIdKey{}).(string)

@@ -240,6 +240,28 @@ func (intervals Intervals) PassedIntervals(exclusions Intervals) Intervals {
 	return out
 }
 
+func ChunkIntervals(intervals Intervals, chunkSize time.Duration) Intervals {
+	if chunkSize <= 0 {
+		return nil
+	}
+
+	result := make(Intervals, 0)
+	for _, interval := range intervals {
+		if !interval.IsValid() {
+			continue
+		}
+
+		for start := interval.Start; !start.Add(chunkSize).After(interval.End); start = start.Add(chunkSize) {
+			result = append(result, Interval{
+				Start: start,
+				End:   start.Add(chunkSize),
+			})
+		}
+	}
+
+	return result
+}
+
 func (i Interval) ToSlot() Slot {
 	return Slot{Start: i.Start, Dur: i.End.Sub(i.Start)}
 }

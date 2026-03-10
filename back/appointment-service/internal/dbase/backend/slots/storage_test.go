@@ -172,3 +172,25 @@ func TestStorageBusinessRule(t *testing.T) {
 		t.Fatal("rule should be deleted")
 	}
 }
+
+func TestGetBusinessSlotSettings(t *testing.T) {
+	storage := TimeSlotsStorage{test.InitTmpDB(t)}
+	defer storage.Close()
+
+	_, err := storage.Exec(`INSERT INTO business_slot_settings (business_id, default_chunk_minutes, max_chunk_minutes) VALUES ($1, $2, $3)`, "b1", 25, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	settings, err := storage.GetBusinessSlotSettings("b1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if settings.DefaultChunk != 25*time.Minute {
+		t.Fatalf("unexpected default chunk: %v", settings.DefaultChunk)
+	}
+	if settings.MaxChunk != 50*time.Minute {
+		t.Fatalf("unexpected max chunk: %v", settings.MaxChunk)
+	}
+}

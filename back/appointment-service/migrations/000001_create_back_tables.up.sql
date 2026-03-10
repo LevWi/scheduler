@@ -28,6 +28,7 @@ CREATE TABLE business_work_rule (
 	UNIQUE (id, business_id)
 );
 
+
 CREATE TABLE user_bots (
     bot_id          TEXT PRIMARY KEY,
     bot_token_hash  TEXT NOT NULL,

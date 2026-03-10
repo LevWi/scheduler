@@ -360,3 +360,42 @@ func TestSetPassedIntervals(t *testing.T) {
 	)
 
 }
+
+func TestChunkIntervals(t *testing.T) {
+	start := time.Date(2024, 10, 10, 9, 0, 0, 0, time.UTC)
+	in := Intervals{{Start: start, End: start.Add(1 * time.Hour)}}
+
+	got := ChunkIntervals(in, 15*time.Minute)
+	if len(got) != 4 {
+		t.Fatalf("expected 4 chunks, got %d", len(got))
+	}
+
+	for i := range got {
+		expectedStart := start.Add(time.Duration(i) * 15 * time.Minute)
+		expectedEnd := expectedStart.Add(15 * time.Minute)
+		if !got[i].Start.Equal(expectedStart) || !got[i].End.Equal(expectedEnd) {
+			t.Fatalf("chunk %d mismatch, got %v - %v", i, got[i].Start, got[i].End)
+		}
+	}
+}
+
+func TestChunkIntervalsSkipsShortAndInvalidIntervals(t *testing.T) {
+	start := time.Date(2024, 10, 10, 9, 0, 0, 0, time.UTC)
+	in := Intervals{
+		{Start: start, End: start.Add(10 * time.Minute)},
+		{Start: start.Add(2 * time.Hour), End: start.Add(2 * time.Hour)},
+		{Start: start.Add(3 * time.Hour), End: start.Add(3*time.Hour + 30*time.Minute)},
+	}
+
+	got := ChunkIntervals(in, 15*time.Minute)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 chunks, got %d", len(got))
+	}
+
+	if got[0].Start != start.Add(3*time.Hour) || got[0].End != start.Add(3*time.Hour+15*time.Minute) {
+		t.Fatalf("unexpected first chunk: %v", got[0])
+	}
+	if got[1].Start != start.Add(3*time.Hour+15*time.Minute) || got[1].End != start.Add(3*time.Hour+30*time.Minute) {
+		t.Fatalf("unexpected second chunk: %v", got[1])
+	}
+}
