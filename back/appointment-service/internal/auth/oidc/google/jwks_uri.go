@@ -9,8 +9,8 @@ import (
 
 const GoogleOpenIDDoc = "https://accounts.google.com/.well-known/openid-configuration"
 
-func FetchGoogleJWKsUri(ctx context.Context) (string, error) {
-	return fetchJWKsURI(ctx, http.DefaultClient, GoogleOpenIDDoc)
+func FetchGoogleJWKsUri(ctx context.Context, client *http.Client) (string, error) {
+	return fetchJWKsURI(ctx, client, GoogleOpenIDDoc)
 }
 
 func fetchJWKsURI(ctx context.Context, httpClient *http.Client, openIDDocURL string) (string, error) {
