@@ -13,6 +13,29 @@ type TimeSlotsStorage struct {
 	*sqlx.DB
 }
 
+type BusinessSlotSettings struct {
+	DefaultChunk time.Duration
+	MaxChunk     time.Duration
+}
+
+type dbBusinessSlotSettings struct {
+	DefaultChunkMinutes int `db:"default_chunk_minutes"`
+	MaxChunkMinutes     int `db:"max_chunk_minutes"`
+}
+
+func (db *TimeSlotsStorage) GetBusinessSlotSettings(businessID common.ID) (BusinessSlotSettings, error) {
+	var row dbBusinessSlotSettings
+	err := db.Get(&row, `SELECT default_chunk_minutes, max_chunk_minutes FROM business_slot_settings WHERE business_id = $1`, string(businessID))
+	if err != nil {
+		return BusinessSlotSettings{}, err
+	}
+
+	return BusinessSlotSettings{
+		DefaultChunk: time.Duration(row.DefaultChunkMinutes) * time.Minute,
+		MaxChunk:     time.Duration(row.MaxChunkMinutes) * time.Minute,
+	}, nil
+}
+
 type dbBusySlot struct {
 	Customer  string `db:"customer_id"`
 	Business  string `db:"business_id"` // TODO use integer
