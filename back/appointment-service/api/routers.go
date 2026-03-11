@@ -164,6 +164,18 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 			"POST",
 			"/slots",
 			AuthHandler(a.cookieAuth, a.SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}), http.HandlerFunc(LoginRequired)),
+		},
+		Route{
+			"GetBusinessSlotSettings",
+			"GET",
+			"/slots/settings",
+			AuthHandler(a.cookieAuth, a.GetBusinessSlotSettingsHandler(), http.HandlerFunc(LoginRequired)),
+		},
+		Route{
+			"SetBusinessSlotSettings",
+			"POST",
+			"/slots/settings",
+			AuthHandler(a.cookieAuth, a.SetBusinessSlotSettingsHandler(), http.HandlerFunc(LoginRequired)),
 		})
 }
 

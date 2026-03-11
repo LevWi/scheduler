@@ -18,11 +18,24 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	fallbackDefaultBookingSlotChunk = 15 * time.Minute
-	fallbackMaxBookingSlotChunk     = 1 * time.Hour
-	minBookingSlotChunk             = 5 * time.Minute
-)
+type businessSlotSettingsPayload struct {
+	DefaultChunkMinutes int `json:"default_chunk_minutes"`
+	MaxChunkMinutes     int `json:"max_chunk_minutes"`
+}
+
+func defaultBusinessSlotSettings() slotsdb.BusinessSlotSettings {
+	return slotsdb.BusinessSlotSettings{
+		DefaultChunk: common.DefaultBookingSlotChunk,
+		MaxChunk:     common.MaxBookingSlotChunk,
+	}
+}
+
+func encodeBusinessSlotSettings(settings slotsdb.BusinessSlotSettings) businessSlotSettingsPayload {
+	return businessSlotSettingsPayload{
+		DefaultChunkMinutes: int(settings.DefaultChunk.Minutes()),
+		MaxChunkMinutes:     int(settings.MaxChunk.Minutes()),
+	}
+}
 
 func parseTime(s string) (time.Time, error) {
 	return time.Parse(time.RFC3339, s)
@@ -53,7 +66,7 @@ func getSlotChunkFromURL(v url.Values, defaults slotsdb.BusinessSlotSettings) (t
 	}
 
 	chunk := time.Duration(chunkMinutes) * time.Minute
-	if chunk < minBookingSlotChunk || chunk > defaults.MaxChunk {
+	if chunk < common.MinBookingSlotChunk || chunk > defaults.MaxChunk {
 		return 0, fmt.Errorf("chunk_minutes out of range")
 	}
 
@@ -94,10 +107,7 @@ func (a *api) SlotsBusinessIdGetFunc() http.HandlerFunc {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			chunkSettings = slotsdb.BusinessSlotSettings{
-				DefaultChunk: fallbackDefaultBookingSlotChunk,
-				MaxChunk:     fallbackMaxBookingSlotChunk,
-			}
+			chunkSettings = defaultBusinessSlotSettings()
 		}
 
 		slotChunk, err := getSlotChunkFromURL(query, chunkSettings)
@@ -271,6 +281,61 @@ func (a *api) SlotsBusinessIdPostFunc(au AddSlotsAuth) http.HandlerFunc {
 			Customer: authResult.Customer,
 			Slots:    slots,
 		})
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (a *api) GetBusinessSlotSettingsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := GetUserID(r.Context())
+		if !ok {
+			panic("uid not found")
+		}
+
+		settings, err := a.storages.TimeSlots.GetBusinessSlotSettings(uid)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				slog.WarnContext(r.Context(), "GetBusinessSlotSettings", "err", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			settings = defaultBusinessSlotSettings()
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		if err := json.NewEncoder(w).Encode(encodeBusinessSlotSettings(settings)); err != nil {
+			slog.WarnContext(r.Context(), "GetBusinessSlotSettings encode", "err", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (a *api) SetBusinessSlotSettingsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := GetUserID(r.Context())
+		if !ok {
+			panic("uid not found")
+		}
+
+		var req businessSlotSettingsPayload
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			slog.WarnContext(r.Context(), "SetBusinessSlotSettings decode", "err", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		settings := slotsdb.BusinessSlotSettings{
+			DefaultChunk: time.Duration(req.DefaultChunkMinutes) * time.Minute,
+			MaxChunk:     time.Duration(req.MaxChunkMinutes) * time.Minute,
+		}
+
+		if err := a.storages.TimeSlots.SetBusinessSlotSettings(uid, settings); err != nil {
+			slog.WarnContext(r.Context(), "SetBusinessSlotSettings", "err", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		w.WriteHeader(http.StatusOK)
 	}
