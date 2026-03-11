@@ -194,3 +194,57 @@ func TestGetBusinessSlotSettings(t *testing.T) {
 		t.Fatalf("unexpected max chunk: %v", settings.MaxChunk)
 	}
 }
+
+func TestSetBusinessSlotSettings(t *testing.T) {
+	storage := TimeSlotsStorage{test.InitTmpDB(t)}
+	defer storage.Close()
+
+	err := storage.SetBusinessSlotSettings("b1", BusinessSlotSettings{DefaultChunk: 20 * time.Minute, MaxChunk: 40 * time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	settings, err := storage.GetBusinessSlotSettings("b1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.DefaultChunk != 20*time.Minute || settings.MaxChunk != 40*time.Minute {
+		t.Fatalf("unexpected settings: %+v", settings)
+	}
+
+	err = storage.SetBusinessSlotSettings("b1", BusinessSlotSettings{DefaultChunk: 30 * time.Minute, MaxChunk: 60 * time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	settings, err = storage.GetBusinessSlotSettings("b1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.DefaultChunk != 30*time.Minute || settings.MaxChunk != 60*time.Minute {
+		t.Fatalf("unexpected updated settings: %+v", settings)
+	}
+}
+
+func TestBusinessSlotSettingsValidation(t *testing.T) {
+	storage := TimeSlotsStorage{test.InitTmpDB(t)}
+	defer storage.Close()
+
+	if err := storage.SetBusinessSlotSettings("b1", BusinessSlotSettings{DefaultChunk: 4 * time.Minute, MaxChunk: 10 * time.Minute}); err == nil {
+		t.Fatal("expected validation error for too small default chunk")
+	}
+	if err := storage.SetBusinessSlotSettings("b1", BusinessSlotSettings{DefaultChunk: 10 * time.Minute, MaxChunk: 4 * time.Minute}); err == nil {
+		t.Fatal("expected validation error for too small max chunk")
+	}
+	if err := storage.SetBusinessSlotSettings("b1", BusinessSlotSettings{DefaultChunk: 30 * time.Minute, MaxChunk: 20 * time.Minute}); err == nil {
+		t.Fatal("expected validation error for default > max")
+	}
+
+	_, err := storage.Exec(`INSERT INTO business_slot_settings (business_id, default_chunk_minutes, max_chunk_minutes) VALUES ($1, $2, $3)`, "b2", 3, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.GetBusinessSlotSettings("b2"); err == nil {
+		t.Fatal("expected validation error on read")
+	}
+}

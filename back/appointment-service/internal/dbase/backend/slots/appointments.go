@@ -2,6 +2,7 @@ package slots
 
 import (
 	"encoding/json"
+	"fmt"
 	common "scheduler/appointment-service/internal"
 	"time"
 
@@ -18,6 +19,17 @@ type BusinessSlotSettings struct {
 	MaxChunk     time.Duration
 }
 
+func validateBusinessSlotSettings(settings BusinessSlotSettings) error {
+	minChunk := common.MinBookingSlotChunk
+	if settings.DefaultChunk < minChunk || settings.MaxChunk < minChunk {
+		return fmt.Errorf("slot chunk is less than minimum allowed")
+	}
+	if settings.DefaultChunk > settings.MaxChunk {
+		return fmt.Errorf("default chunk is greater than max chunk")
+	}
+	return nil
+}
+
 type dbBusinessSlotSettings struct {
 	DefaultChunkMinutes int `db:"default_chunk_minutes"`
 	MaxChunkMinutes     int `db:"max_chunk_minutes"`
@@ -30,10 +42,34 @@ func (db *TimeSlotsStorage) GetBusinessSlotSettings(businessID common.ID) (Busin
 		return BusinessSlotSettings{}, err
 	}
 
-	return BusinessSlotSettings{
+	settings := BusinessSlotSettings{
 		DefaultChunk: time.Duration(row.DefaultChunkMinutes) * time.Minute,
 		MaxChunk:     time.Duration(row.MaxChunkMinutes) * time.Minute,
-	}, nil
+	}
+
+	if err := validateBusinessSlotSettings(settings); err != nil {
+		return BusinessSlotSettings{}, err
+	}
+
+	return settings, nil
+}
+
+func (db *TimeSlotsStorage) SetBusinessSlotSettings(businessID common.ID, settings BusinessSlotSettings) error {
+	if err := validateBusinessSlotSettings(settings); err != nil {
+		return err
+	}
+
+	_, err := db.Exec(`
+		INSERT INTO business_slot_settings (business_id, default_chunk_minutes, max_chunk_minutes)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (business_id) DO UPDATE
+		SET default_chunk_minutes = EXCLUDED.default_chunk_minutes,
+		    max_chunk_minutes = EXCLUDED.max_chunk_minutes`,
+		string(businessID),
+		int(settings.DefaultChunk.Minutes()),
+		int(settings.MaxChunk.Minutes()),
+	)
+	return err
 }
 
 type dbBusySlot struct {
