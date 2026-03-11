@@ -26,7 +26,7 @@ type businessSlotSettingsPayload struct {
 func defaultBusinessSlotSettings() slotsdb.BusinessSlotSettings {
 	return slotsdb.BusinessSlotSettings{
 		DefaultChunk: common.DefaultBookingSlotChunk,
-		MaxChunk:     common.MaxBookingSlotChunk,
+		MaxChunk:     common.DefaultMaxBookingSlotChunk,
 	}
 }
 
