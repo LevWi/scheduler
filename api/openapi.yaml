@@ -1,145 +1,408 @@
 openapi: 3.0.0
 info:
-  title: "Scheduler service"
-  version: "0.1"
+  title: Scheduler service
+  version: "0.2"
+  description: |
+    Actual API surface implemented by `back/appointment-service/api` routers and handlers.
+    **Note: This is an automatically generated file. Errors may occur.**
+servers:
+  - url: /
+
+tags:
+  - name: OIDC
+  - name: Authentication
+  - name: Time slots
+  - name: Business rules
+  - name: User bots
+
 paths:
-  /login:
+  /oauth_login:
+    get:
+      tags: [OIDC]
+      summary: Start OAuth2 login flow
+      responses:
+        '307':
+          description: Temporary redirect to OAuth provider
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /callback:
+    get:
+      tags: [OIDC]
+      summary: OAuth2 callback endpoint
+      parameters:
+        - in: query
+          name: state
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: code
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: User authenticated, session cookie updated
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: sid=abcde12345; Path=/; HttpOnly
+        '400':
+          description: Invalid callback params
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /logout:
     post:
-      tags: 
-        - Authentication
+      tags: [Authentication]
+      summary: Logout authenticated user
+      security:
+        - UserSessionAuth: []
+      responses:
+        '200':
+          description: Session reset
+        '511':
+          description: Authentication required
+
+  /user/delete:
+    post:
+      tags: [Authentication]
+      summary: Delete authenticated user account
+      description: Expects form field `password`.
+      security:
+        - UserSessionAuth: []
       requestBody:
         required: true
         content:
           application/x-www-form-urlencoded:
             schema:
               type: object
+              required: [password]
               properties:
-                username:
-                  type: string
                 password:
                   type: string
       responses:
         '200':
-          description: Success. Session cookie returned
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-                example: sid=abcde12345; Path=/; HttpOnly
-        'default':
-          description: General error
-  /logout:
+          description: User removed and session reset
+        '400':
+          description: Invalid request or wrong password
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
+  /user/bots:
     post:
-      tags:
-        - Authentication
-      parameters: 
-          - in: cookie
-            name: sid
-            schema:
-              type: string
+      tags: [User bots]
+      summary: Create bot credentials for authenticated business user
+      security:
+        - UserSessionAuth: []
       responses:
         '200':
-          description: Success. Result is modified cookie
-          headers:
-            Set-Cookie:
+          description: Bot credentials generated
+          content:
+            application/json:
               schema:
-                type: string
-                example: sid=abcde12345; Path=/; HttpOnly
-        'default':
-          description: General error
+                $ref: '#/components/schemas/BotCredentials'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
+  /user/bots/{bot_id}:
+    delete:
+      tags: [User bots]
+      summary: Delete bot by ID
+      security:
+        - UserSessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BotId'
+      responses:
+        '200':
+          description: Bot deleted
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
   /slots/{business_id}:
     get:
-      summary: Available time slots
-      tags:
-        - Time slots
-      parameters: 
-        - name: business_id
-          in: path
-          required: true
+      tags: [Time slots]
+      summary: Get available time slots for business in time range
+      parameters:
+        - $ref: '#/components/parameters/BusinessId'
+        - $ref: '#/components/parameters/DateStart'
+        - $ref: '#/components/parameters/DateEnd'
+        - in: query
+          name: chunk_minutes
           schema:
-            type: string
-          example: "550e8400-e29b-41d4-a716-446655440000"
-        - name: date_start
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-        - name: date_end
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
+            type: integer
+            minimum: 5
+          description: Optional returned slot chunk size in minutes.
       responses:
         '200':
-          description: Successful operation
+          description: Available slots
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AvailableSlots'
-        'default':
-          description: General error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+        '400':
+          description: Invalid/missing query or path params
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /slots/once:
     post:
-      summary: Try to register time slot(s)
-      tags:
-        - Time slots
-      parameters: 
-        - name: business_id
-          in: path
+      tags: [Time slots]
+      summary: Book slots using one-off token
+      parameters:
+        - in: query
+          name: token
           required: true
           schema:
             type: string
-            example: "550e8400-e29b-41d4-a716-446655440000"
       requestBody:
+        required: true
         content:
-          'application/json':
+          application/json:
             schema:
-                $ref: '#/components/schemas/SlotsRequest'
+              $ref: '#/components/schemas/SlotsToBook'
       responses:
         '200':
-          description: Successful operation
+          description: Slots booked
+        '400':
+          description: Invalid token or request payload
+        '409':
+          description: Requested slots are not available
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /slots/bt:
+    post:
+      tags: [Time slots]
+      summary: Book slots using bot bearer token
+      security:
+        - BotBearerAuth: []
+      parameters:
+        - in: query
+          name: customer_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotsToBook'
+      responses:
+        '200':
+          description: Slots booked
+        '400':
+          description: Invalid request payload
+        '409':
+          description: Requested slots are not available
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
+  /slots:
+    post:
+      tags: [Time slots]
+      summary: Book slots as authenticated business user
+      security:
+        - UserSessionAuth: []
+      parameters:
+        - in: query
+          name: customer_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotsToBook'
+      responses:
+        '200':
+          description: Slots booked
+        '400':
+          description: Invalid request payload
+        '409':
+          description: Requested slots are not available
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
+  /slots/settings:
+    get:
+      tags: [Time slots]
+      summary: Get booking chunk settings for authenticated business
+      security:
+        - UserSessionAuth: []
+      responses:
+        '200':
+          description: Current slot settings
           content:
             application/json:
               schema:
-                properties:
-                  query_id:
-                    type: string
-                    example: "550e8400-e29b-41d4-a716-446655440000"
-        'default':
-          description: General error
+                $ref: '#/components/schemas/BusinessSlotSettings'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+    post:
+      tags: [Time slots]
+      summary: Set booking chunk settings for authenticated business
+      security:
+        - UserSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessSlotSettings'
+      responses:
+        '200':
+          description: Settings updated
+        '400':
+          description: Invalid settings payload
+        '511':
+          description: Authentication required
+
+  /rrules:
+    post:
+      tags: [Business rules]
+      summary: Add business recurrence rule
+      security:
+        - UserSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntervalRRuleWithType'
+      responses:
+        '200':
+          description: Rule added
+        '400':
+          description: Invalid JSON
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+    get:
+      tags: [Business rules]
+      summary: List business recurrence rules
+      security:
+        - UserSessionAuth: []
+      responses:
+        '200':
+          description: Rules list
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: array
+                items:
+                  $ref: '#/components/schemas/BusinessRule'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
+  /rrules/{id}:
+    delete:
+      tags: [Business rules]
+      summary: Delete business recurrence rule
+      security:
+        - UserSessionAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule deleted
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '511':
+          description: Authentication required
+
 components:
   securitySchemes:
-      UserAuth: # arbitrary name for the security scheme; will be used in the "security" key later
-        type: apiKey
-        in: cookie
-        name: sid
+    UserSessionAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+    BotBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+
+  parameters:
+    BusinessId:
+      in: path
+      name: business_id
+      required: true
+      schema:
+        type: string
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    BotId:
+      in: path
+      name: bot_id
+      required: true
+      schema:
+        type: string
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    DateStart:
+      in: query
+      name: date_start
+      required: true
+      schema:
+        type: string
+        format: date-time
+      example: "2026-01-15T08:00:00Z"
+    DateEnd:
+      in: query
+      name: date_end
+      required: true
+      schema:
+        type: string
+        format: date-time
+      example: "2026-01-15T20:00:00Z"
+
+  responses:
+    InternalError:
+      description: Internal server error
+
   schemas:
     Slot:
+      type: object
+      required: [tp_start, len]
       properties:
         tp_start:
           type: string
           format: date-time
         len:
           type: integer
-    SlotsRequest:
-      properties:
-        client_id:
-          type: string
-          example: "550e8400-e29b-41d4-a716-446655440000"
-        slots:
-            type: array
-            items:
-                  $ref: '#/components/schemas/Slot'
+          description: Slot duration in minutes
+          minimum: 1
+
+    SlotsToBook:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/Slot'
+
     AvailableSlots:
+      type: object
       properties:
         query_id:
           type: string
@@ -147,14 +410,54 @@ components:
         slots:
           type: array
           items:
-                $ref: '#/components/schemas/Slot'
-    Error:
+            $ref: '#/components/schemas/Slot'
+
+    BusinessSlotSettings:
+      type: object
+      required: [default_chunk_minutes, max_chunk_minutes]
       properties:
-        query_id:
-          type: string
-          example: "550e8400-e29b-41d4-a716-446655440000"
-        description:
-          type: string
-        code:
+        default_chunk_minutes:
           type: integer
-  
+          minimum: 1
+        max_chunk_minutes:
+          type: integer
+          minimum: 1
+
+    BotCredentials:
+      type: object
+      properties:
+        bot_id:
+          type: string
+        token:
+          type: string
+
+    IntervalRRule:
+      type: object
+      required: [RRule, Len]
+      properties:
+        RRule:
+          type: string
+          description: RFC5545 RRULE string
+          example: "DTSTART:20260101T090000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+        Len:
+          type: integer
+          description: Duration in seconds
+          example: 3600
+
+    IntervalRRuleWithType:
+      type: object
+      required: [Rule, Type]
+      properties:
+        Rule:
+          $ref: '#/components/schemas/IntervalRRule'
+        Type:
+          type: string
+          enum: [inclusion, exclusion]
+
+    BusinessRule:
+      type: object
+      properties:
+        Id:
+          type: string
+        Rule:
+          $ref: '#/components/schemas/IntervalRRuleWithType'

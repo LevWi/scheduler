@@ -87,8 +87,8 @@ func (a *api) addUserAccountHandlers(r *mux.Router) {
 		},
 		Route{
 			"DeleteUser",
-			"DELETE",
-			"/user",
+			"POST",
+			"/user/delete",
 			AuthHandler(a.cookieAuth,
 				DeleteUserHandler(a.userSessionsStore, a.storages.Auth.DeleteUserWithCheck),
 				http.HandlerFunc(LoginRequired)),
