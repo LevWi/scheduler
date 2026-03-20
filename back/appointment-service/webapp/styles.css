@@ -1,0 +1,166 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --text: #111827;
+  --hint: #6b7280;
+  --card: #f3f4f6;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --muted-border: #d1d5db;
+  --danger-muted: #f3f4f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 14px 14px calc(env(safe-area-inset-bottom) + 16px);
+}
+
+h2 {
+  margin: 12px 0;
+  font-size: 18px;
+}
+
+.quick-slots {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.quick-slot,
+.slot-btn,
+.confirm-btn,
+.day-btn,
+.icon-btn {
+  border: 1px solid var(--muted-border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  min-height: 44px;
+  padding: 8px;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.quick-slot:active,
+.slot-btn:active,
+.confirm-btn:active,
+.day-btn:active,
+.icon-btn:active {
+  transform: scale(0.98);
+}
+
+.quick-slot.active,
+.day-btn.selected,
+.slot-btn.selected,
+.confirm-btn {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.quick-slot small {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.calendar-section {
+  margin-top: 12px;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.icon-btn {
+  width: 44px;
+  min-height: 44px;
+}
+
+.weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.weekdays {
+  margin: 8px 0;
+  color: var(--hint);
+  font-size: 13px;
+  text-align: center;
+}
+
+.calendar-grid {
+  min-height: 232px;
+  transition: opacity 150ms ease;
+}
+
+.calendar-grid.loading {
+  opacity: 0.4;
+}
+
+.day-btn {
+  text-align: center;
+  background: transparent;
+  min-height: 40px;
+}
+
+.day-btn.other {
+  opacity: 0.5;
+}
+
+.day-btn.today {
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.day-btn.has-slots::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.day-slots {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.slot-btn[disabled] {
+  opacity: 0.55;
+  background: var(--danger-muted);
+}
+
+.confirm-wrap {
+  position: sticky;
+  bottom: 0;
+  padding-top: 12px;
+  background: linear-gradient(to top, var(--bg) 70%, rgba(0, 0, 0, 0));
+}
+
+.confirm-btn {
+  width: 100%;
+  font-weight: 700;
+}
+
+.msg {
+  color: var(--hint);
+  font-size: 14px;
+}
