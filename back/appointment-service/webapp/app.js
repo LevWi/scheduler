@@ -1,16 +1,21 @@
 (() => {
   const tg = window.Telegram?.WebApp;
+  const params = new URLSearchParams(location.search);
   tg?.ready();
   tg?.expand();
 
   const state = {
-    businessId: new URLSearchParams(location.search).get('business_id') || '',
-    apiBase: new URLSearchParams(location.search).get('api_base') || '',
+    businessId: params.get('business_id') || '',
+    apiBase: params.get('api_base') || '',
+    clientId: params.get('telegram_bot_id')
+      || params.get('bot_id')
+      || '',
     monthDate: new Date(),
     selectedDate: null,
     selectedSlot: null,
     monthSlots: [],
     daySlots: [],
+    isSubmitting: false,
   };
 
   const quickSlotsEl = document.getElementById('quick-slots');
@@ -40,16 +45,7 @@
   function bindEvents() {
     document.getElementById('prev-month').addEventListener('click', () => shiftMonth(-1));
     document.getElementById('next-month').addEventListener('click', () => shiftMonth(1));
-    confirmBtn.addEventListener('click', () => {
-      if (!state.selectedSlot) return;
-      const payload = {
-        action: 'slot_selected',
-        business_id: state.businessId,
-        slot: state.selectedSlot,
-      };
-      tg?.sendData(JSON.stringify(payload));
-      tg?.HapticFeedback?.notificationOccurred('success');
-    });
+    confirmBtn.addEventListener('click', () => submitSelection());
   }
 
   async function shiftMonth(offset) {
@@ -154,8 +150,7 @@
 
   function renderDaySlots() {
     daySlotsEl.innerHTML = '';
-    confirmBtn.hidden = true;
-    confirmBtn.disabled = true;
+    setConfirmDisabled(true);
 
     if (!state.daySlots.length) {
       renderMessage(daySlotsEl, 'На выбранный день доступных слотов нет');
@@ -179,10 +174,51 @@
         state.selectedSlot = slot;
         [...daySlotsEl.children].forEach((el) => el.classList.remove('selected'));
         btn.classList.add('selected');
-        confirmBtn.hidden = false;
-        confirmBtn.disabled = false;
+        setConfirmDisabled(false);
       });
       daySlotsEl.appendChild(btn);
+    }
+  }
+
+  async function submitSelection() {
+    if (!state.selectedSlot || state.isSubmitting) return;
+    if (!state.clientId) {
+      renderMessage(daySlotsEl, 'Передайте telegram_bot_id или bot_id в query string');
+      return;
+    }
+    if (!tg?.initData) {
+      renderMessage(daySlotsEl, 'Telegram initData отсутствует');
+      return;
+    }
+
+    state.isSubmitting = true;
+    setConfirmDisabled(true, 'Подтверждаем...');
+
+    try {
+      const url = `${state.apiBase}/slots/webapp`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json; charset=UTF-8',
+          Authorization: `tma ${tg.initData}`,
+          'X-Client-ID': state.clientId,
+        },
+        body: JSON.stringify([state.selectedSlot]),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      tg?.HapticFeedback?.notificationOccurred('success');
+      renderMessage(daySlotsEl, 'Запись подтверждена');
+      setConfirmDisabled(true, 'Запись подтверждена');
+      tg?.close();
+    } catch (err) {
+      tg?.HapticFeedback?.notificationOccurred('error');
+      renderMessage(daySlotsEl, `Не удалось подтвердить запись: ${err.message}`);
+      setConfirmDisabled(false);
+    } finally {
+      state.isSubmitting = false;
     }
   }
 
@@ -209,6 +245,12 @@
     p.className = 'msg';
     p.textContent = text;
     root.appendChild(p);
+  }
+
+  function setConfirmDisabled(disabled, text = 'Подтвердить запись') {
+    confirmBtn.hidden = !state.selectedSlot && disabled && text === 'Подтвердить запись';
+    confirmBtn.disabled = disabled;
+    confirmBtn.textContent = text;
   }
 
   function capitalize(str) {
