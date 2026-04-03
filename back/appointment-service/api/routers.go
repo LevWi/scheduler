@@ -141,6 +141,15 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 	addRoutes(
 		r,
 		Route{
+			"SlotsBusinessIdGetFromWebApp",
+			"GET",
+			"/slots/webapp",
+			a.SlotsBusinessWebAppGetFunc(AddSlotsAuthTgWebApp{
+				BotsStorage: a.storages.Bots,
+				Validator:   auth.NewTelegramWebAppInitDataValidator(),
+			}),
+		},
+		Route{
 			"SlotsBusinessIdGet",
 			"GET",
 			"/slots/{business_id}",
@@ -164,15 +173,6 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 			"POST",
 			"/slots/webapp",
 			a.SlotsBusinessIdPostFunc(AddSlotsAuthTgWebApp{
-				BotsStorage: a.storages.Bots,
-				Validator:   auth.NewTelegramWebAppInitDataValidator(),
-			}),
-		},
-		Route{
-			"SlotsBusinessIdGetFromWebApp",
-			"GET",
-			"/slots/webapp",
-			a.SlotsBusinessWebAppGetFunc(AddSlotsAuthTgWebApp{
 				BotsStorage: a.storages.Bots,
 				Validator:   auth.NewTelegramWebAppInitDataValidator(),
 			}),
