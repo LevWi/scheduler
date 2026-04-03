@@ -225,6 +225,14 @@
   }
 
   async function getSlots(dateStart, dateEnd) {
+    if (!state.clientId) {
+      throw new Error('Передайте telegram_bot_id или bot_id в query string');
+    }
+    const initData = tg?.initData;
+    if (!initData) {
+      throw new Error('Telegram initData отсутствует');
+    }
+
     const qs = new URLSearchParams({
       date_start: dateStart.toISOString(),
       date_end: dateEnd.toISOString(),
@@ -233,7 +241,7 @@
     const res = await fetch(url, {
       headers: {
         Accept: 'application/json',
-        Authorization: `tma ${tg.initData}`,
+        Authorization: `tma ${initData}`,
         'X-Client-ID': state.clientId,
       },
     });
