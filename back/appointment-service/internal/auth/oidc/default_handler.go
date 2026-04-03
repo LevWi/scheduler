@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/MicahParks/jwkset"
 
@@ -11,7 +12,8 @@ import (
 
 func NewOIDCAuthCheckDefault(ctx context.Context, dbase *auth.AuthStorage) (OIDCAuthCheck, error) {
 	//TODO make it with periodically update?
-	url, err := google.FetchGoogleJWKsUri(ctx)
+	//TODO make timeout
+	url, err := google.FetchGoogleJWKsUri(ctx, http.DefaultClient)
 	if err != nil {
 		return nil, err
 	}
