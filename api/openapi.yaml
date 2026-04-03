@@ -209,6 +209,35 @@ paths:
         '511':
           description: Authentication required
 
+  /slots/webapp:
+    post:
+      tags: [Time slots]
+      summary: Book slots from Telegram Mini App using initData validation
+      security:
+        - TelegramMiniAppAuth: []
+      parameters:
+        - in: header
+          name: X-Client-ID
+          required: true
+          schema:
+            type: string
+          description: Telegram bot identifier stored as `bot_id` in `user_bots`, used for signature verification and business lookup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotsToBook'
+      responses:
+        '200':
+          description: Slots booked
+        '400':
+          description: Invalid initData, missing bot identifiers or invalid request payload
+        '409':
+          description: Requested slots are not available
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /slots:
     post:
       tags: [Time slots]
@@ -345,6 +374,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: token
+    TelegramMiniAppAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Use `Authorization: tma <initData>`.
 
   parameters:
     BusinessId:

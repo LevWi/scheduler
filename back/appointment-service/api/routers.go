@@ -160,6 +160,15 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 			AuthHandler(botAuthMethod(&bs), a.SlotsBusinessIdPostFunc(AddSlotsAuthFromUrl{}), http.HandlerFunc(LoginRequired)),
 		},
 		Route{
+			"SlotsBusinessIdPostFromWebApp",
+			"POST",
+			"/slots/webapp",
+			a.SlotsBusinessIdPostFunc(AddSlotsAuthTgWebApp{
+				BotsStorage: a.storages.Bots,
+				Validator:   auth.NewTelegramWebAppInitDataValidator(),
+			}),
+		},
+		Route{
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots",

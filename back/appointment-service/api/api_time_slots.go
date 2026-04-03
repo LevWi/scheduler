@@ -12,8 +12,10 @@ import (
 
 	swagger "scheduler/appointment-service/api/types"
 	common "scheduler/appointment-service/internal"
+	tgauth "scheduler/appointment-service/internal/auth"
 	"scheduler/appointment-service/internal/dbase/auth"
 	slotsdb "scheduler/appointment-service/internal/dbase/backend/slots"
+	botsdb "scheduler/appointment-service/internal/dbase/bots"
 
 	"github.com/gorilla/mux"
 )
@@ -192,6 +194,38 @@ func (a *AddSlotsAuthOneOffToken) Authorization(r *http.Request) (AuthResult, er
 	return result, err
 }
 
+type AddSlotsAuthTgWebApp struct {
+	BotsStorage *botsdb.BotsStorage
+	Validator   tgauth.TelegramWebAppInitDataValidator
+}
+
+func (a AddSlotsAuthTgWebApp) Authorization(r *http.Request) (AuthResult, error) {
+	var result AuthResult
+	clientID, err := tgauth.ClientIDFromHeader(r)
+	if err != nil {
+		return result, err
+	}
+
+	initDataRaw, err := tgauth.TelegramWebAppAuthToken(r)
+	if err != nil {
+		return result, err
+	}
+
+	initData, err := a.Validator.Validate(initDataRaw, string(clientID))
+	if err != nil {
+		return result, err
+	}
+
+	bot, err := a.BotsStorage.GetBotByBotId(string(clientID))
+	if err != nil {
+		return result, err
+	}
+
+	result.Business = common.ID(bot.BusinessId)
+	result.Customer = common.ID(strconv.FormatInt(initData.User.ID, 10))
+	return result, nil
+}
+
 // TODO Fix it, change swagger.Slot, prepare error, prepare QueryId
 // TODO Bug: May be race condition between GetAvailableSlotsInRange and AddSlots
 func (a *api) SlotsBusinessIdPostFunc(au AddSlotsAuth) http.HandlerFunc {
@@ -202,6 +236,7 @@ func (a *api) SlotsBusinessIdPostFunc(au AddSlotsAuth) http.HandlerFunc {
 		if err != nil {
 			slog.WarnContext(r.Context(), "[SlotsBusinessIdPost]", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		var jsonSlots []swagger.Slot

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	common "scheduler/appointment-service/internal"
-	"strings"
 )
 
 var ErrWrongToken = errors.New("wrong token")
@@ -20,17 +19,7 @@ type BearerAuth struct {
 }
 
 func getToken(r *http.Request) (string, error) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return "", fmt.Errorf("%w: 'Authorization' header", common.ErrNotFound)
-	}
-
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return "", errors.New("invalid Authorization header format")
-	}
-
-	return parts[1], nil
+	return getAuthorizationTokenByScheme(r, "Bearer")
 }
 
 func (ba *BearerAuth) Authorization(r *http.Request) (common.ID, error) {
@@ -39,9 +28,9 @@ func (ba *BearerAuth) Authorization(r *http.Request) (common.ID, error) {
 		return "", err
 	}
 
-	clientID := r.Header.Get("X-Client-ID")
-	if clientID == "" {
-		return "", fmt.Errorf("%w: 'X-Client-ID' header", common.ErrNotFound)
+	clientID, err := getClientIDFromHeader(r)
+	if err != nil {
+		return "", err
 	}
 
 	businessID, err := ba.TC.TokenCheck(clientID, token)
