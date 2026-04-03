@@ -82,68 +82,85 @@ func (a *api) SlotsBusinessIdGetFunc() http.HandlerFunc {
 		//w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		vars := mux.Vars(r)
 		businessID := vars["business_id"]
-		if businessID == "" {
-			slog.WarnContext(r.Context(), "business_id not found")
+		a.getSlotsByBusinessID(w, r, businessID)
+	}
+}
+
+func (a *api) SlotsBusinessWebAppGetFunc(au AddSlotsAuth) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authResult, err := au.Authorization(r)
+		if err != nil {
+			slog.WarnContext(r.Context(), "[SlotsBusinessWebAppGet]", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		query := r.URL.Query()
-		dateStart, err := getTimeFromURL("date_start", query)
-		if err != nil {
-			slog.WarnContext(r.Context(), err.Error())
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		dateEnd, err := getTimeFromURL("date_end", query)
-		if err != nil {
-			slog.WarnContext(r.Context(), err.Error())
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		a.getSlotsByBusinessID(w, r, string(authResult.Business))
+	}
+}
 
-		chunkSettings, err := a.storages.TimeSlots.GetBusinessSlotSettings(businessID)
-		if err != nil {
-			if err != sql.ErrNoRows {
-				slog.WarnContext(r.Context(), err.Error())
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			chunkSettings = defaultBusinessSlotSettings()
-		}
+func (a *api) getSlotsByBusinessID(w http.ResponseWriter, r *http.Request, businessID string) {
+	if businessID == "" {
+		slog.WarnContext(r.Context(), "business_id not found")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-		slotChunk, err := getSlotChunkFromURL(query, chunkSettings)
-		if err != nil {
-			slog.WarnContext(r.Context(), err.Error())
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+	query := r.URL.Query()
+	dateStart, err := getTimeFromURL("date_start", query)
+	if err != nil {
+		slog.WarnContext(r.Context(), err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	dateEnd, err := getTimeFromURL("date_end", query)
+	if err != nil {
+		slog.WarnContext(r.Context(), err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-		slots, err := a.storages.TimeSlots.GetAvailableSlotsInRange(businessID, common.Interval{Start: dateStart, End: dateEnd})
-		if err != nil {
+	chunkSettings, err := a.storages.TimeSlots.GetBusinessSlotSettings(businessID)
+	if err != nil {
+		if err != sql.ErrNoRows {
 			slog.WarnContext(r.Context(), err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		chunkSettings = defaultBusinessSlotSettings()
+	}
 
-		slots = common.ChunkIntervals(slots, slotChunk)
+	slotChunk, err := getSlotChunkFromURL(query, chunkSettings)
+	if err != nil {
+		slog.WarnContext(r.Context(), err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-		var response swagger.AvailableSlots
-		response.QueryId = r.Context().Value(RequestIdKey{}).(string)
+	slots, err := a.storages.TimeSlots.GetAvailableSlotsInRange(businessID, common.Interval{Start: dateStart, End: dateEnd})
+	if err != nil {
+		slog.WarnContext(r.Context(), err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-		for _, slot := range slots {
-			response.Slots = append(response.Slots, swagger.Slot{
-				TpStart: slot.Start,
-				Len:     int32(slot.End.Sub(slot.Start).Minutes()),
-			})
-		}
+	slots = common.ChunkIntervals(slots, slotChunk)
 
-		err = json.NewEncoder(w).Encode(response)
-		if err != nil {
-			slog.WarnContext(r.Context(), err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	var response swagger.AvailableSlots
+	response.QueryId = r.Context().Value(RequestIdKey{}).(string)
+
+	for _, slot := range slots {
+		response.Slots = append(response.Slots, swagger.Slot{
+			TpStart: slot.Start,
+			Len:     int32(slot.End.Sub(slot.Start).Minutes()),
+		})
+	}
+
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		slog.WarnContext(r.Context(), err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 }
 

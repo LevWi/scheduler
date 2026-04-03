@@ -141,6 +141,16 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 	addRoutes(
 		r,
 		Route{
+			"SlotsBusinessIdGetFromWebApp",
+			"GET",
+			"/slots/webapp",
+			a.SlotsBusinessWebAppGetFunc(AddSlotsAuthTgWebApp{
+				BotsStorage: a.storages.Bots,
+				Validator:   auth.NewTelegramWebAppInitDataValidator(),
+			}),
+		},
+		//TODO GET /slots/{business_id} is deprecated
+		Route{
 			"SlotsBusinessIdGet",
 			"GET",
 			"/slots/{business_id}",
