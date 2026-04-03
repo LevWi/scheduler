@@ -5,7 +5,6 @@
   tg?.expand();
 
   const state = {
-    businessId: params.get('business_id') || '',
     apiBase: params.get('api_base') || '',
     clientId: params.get('telegram_bot_id')
       || params.get('bot_id')
@@ -35,8 +34,12 @@
   bootstrap().catch((err) => renderMessage(daySlotsEl, `Ошибка загрузки: ${err.message}`));
 
   async function bootstrap() {
-    if (!state.businessId) {
-      renderMessage(quickSlotsEl, 'Передайте business_id в query string');
+    if (!state.clientId) {
+      renderMessage(quickSlotsEl, 'Передайте telegram_bot_id или bot_id в query string');
+      return;
+    }
+    if (!tg?.initData) {
+      renderMessage(quickSlotsEl, 'Telegram initData отсутствует');
       return;
     }
     await Promise.all([loadQuickSlots(), loadMonth(state.monthDate)]);
@@ -226,8 +229,14 @@
       date_start: dateStart.toISOString(),
       date_end: dateEnd.toISOString(),
     });
-    const url = `${state.apiBase}/slots/${encodeURIComponent(state.businessId)}?${qs.toString()}`;
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const url = `${state.apiBase}/slots/webapp?${qs.toString()}`;
+    const res = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `tma ${tg.initData}`,
+        'X-Client-ID': state.clientId,
+      },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
