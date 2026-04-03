@@ -160,8 +160,7 @@
     const now = Date.now();
     for (const slot of state.daySlots) {
       const start = new Date(slot.tp_start);
-      const end = new Date(start.getTime() + slot.len * 60000);
-      const isBusy = end.getTime() < now;
+      const isBusy = start.getTime() < now;
       const btn = document.createElement('button');
       btn.className = 'slot-btn';
       btn.disabled = isBusy;
