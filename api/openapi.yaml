@@ -210,6 +210,37 @@ paths:
           description: Authentication required
 
   /slots/webapp:
+    get:
+      tags: [Time slots]
+      summary: Get available slots from Telegram Mini App using initData validation
+      security:
+        - TelegramMiniAppAuth: []
+      parameters:
+        - in: header
+          name: X-Client-ID
+          required: true
+          schema:
+            type: string
+          description: Telegram bot identifier stored as `bot_id` in `user_bots`, used for signature verification and business lookup.
+        - $ref: '#/components/parameters/DateStart'
+        - $ref: '#/components/parameters/DateEnd'
+        - in: query
+          name: chunk_minutes
+          schema:
+            type: integer
+            minimum: 5
+          description: Optional returned slot chunk size in minutes.
+      responses:
+        '200':
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailableSlots'
+        '400':
+          description: Invalid initData or invalid/missing query params
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       tags: [Time slots]
       summary: Book slots from Telegram Mini App using initData validation
