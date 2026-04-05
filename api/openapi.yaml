@@ -269,6 +269,45 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /customer/appointments:
+    get:
+      tags: [Time slots]
+      summary: Get customer appointments for the authenticated Telegram Mini App user
+      security:
+        - TelegramMiniAppAuth: []
+      parameters:
+        - in: header
+          name: X-Client-ID
+          required: true
+          schema:
+            type: string
+          description: Telegram bot identifier stored as `bot_id` in `user_bots`, used for signature verification and business lookup.
+        - in: query
+          name: date_start
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Interval start for filtering appointments. Defaults to current time when omitted.
+        - in: query
+          name: date_end
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Optional interval end for filtering appointments.
+      responses:
+        '200':
+          description: Customer appointments in requested interval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailableSlots'
+        '400':
+          description: Invalid initData or invalid query parameters
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /slots:
     post:
       tags: [Time slots]

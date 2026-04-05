@@ -212,6 +212,53 @@ func (db *TimeSlotsStorage) GetBusySlotsInRange(business_id common.ID, between c
 	return slotsOut, nil
 }
 
+// GetCustomerAppointmentsInRange returns customer's appointments for the given business
+// that overlap the requested interval.
+//
+// Acceptable arguments:
+//   - businessID and customerID must identify the exact business/customer pair to filter by.
+//   - between.Start is required and used as the lower bound.
+//   - between.End is optional:
+//   - if between.End.IsZero() then all appointments with date_end >= between.Start are returned
+//     (including appointments that started before between.Start but are still in progress).
+//   - if between.End is set then appointments are returned only when they overlap
+//     [between.Start, between.End], i.e. date_end >= between.Start AND date_start <= between.End.
+//
+// Returned appointments are ordered by date_start ascending.
+func (db *TimeSlotsStorage) GetCustomerAppointmentsInRange(businessID common.ID, customerID common.ID, between common.Interval) ([]common.BusySlot, error) {
+	var (
+		dbSlots []dbBusySlot
+		err     error
+	)
+
+	if between.End.IsZero() {
+		err = db.Select(
+			&dbSlots,
+			`SELECT * FROM appointments
+			 WHERE business_id = $1 AND customer_id = $2 AND date_end >= $3
+			 ORDER BY date_start`,
+			string(businessID), string(customerID), between.Start.Unix(),
+		)
+	} else {
+		err = db.Select(
+			&dbSlots,
+			`SELECT * FROM appointments
+			 WHERE business_id = $1 AND customer_id = $2 AND date_end >= $3 AND date_start <= $4
+			 ORDER BY date_start`,
+			string(businessID), string(customerID), between.Start.Unix(), between.End.Unix(),
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	slotsOut := make([]common.BusySlot, 0, len(dbSlots))
+	for _, dbSlot := range dbSlots {
+		slotsOut = append(slotsOut, dbSlot.ToSlot())
+	}
+	return slotsOut, nil
+}
+
 func (db *TimeSlotsStorage) DeleteSlots(business_id common.ID, customerID common.ID, start time.Time, end time.Time) error {
 	_, err := db.Exec("DELETE FROM appointments WHERE business_id = $1 AND customer_id = $2 AND date_start BETWEEN $3 AND $4",
 		business_id, customerID, start.Unix(), end.Unix())

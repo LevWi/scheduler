@@ -248,3 +248,105 @@ func TestBusinessSlotSettingsValidation(t *testing.T) {
 		t.Fatal("expected validation error on read")
 	}
 }
+
+func TestGetCustomerAppointmentsInRange(t *testing.T) {
+	storage := TimeSlotsStorage{test.InitTmpDB(t)}
+	defer storage.Close()
+
+	base := time.Now().Truncate(time.Minute)
+	slotInProgress := common.Interval{Start: base.Add(-30 * time.Minute), End: base.Add(30 * time.Minute)}
+	slotAfterStart := common.Interval{Start: base.Add(60 * time.Minute), End: base.Add(90 * time.Minute)}
+	slotAfterAllRanges := common.Interval{Start: base.Add(180 * time.Minute), End: base.Add(210 * time.Minute)}
+
+	err := storage.AddSlots(AddSlotsData{
+		Business: "b1",
+		Customer: "c1",
+		Slots: common.Intervals{
+			slotInProgress,
+			slotAfterStart,
+			slotAfterAllRanges,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = storage.AddSlots(AddSlotsData{
+		Business: "b1",
+		Customer: "c2",
+		Slots: common.Intervals{
+			{Start: base.Add(120 * time.Minute), End: base.Add(150 * time.Minute)},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type tc struct {
+		name       string
+		between    common.Interval
+		want       common.Intervals
+		wantCustID common.ID
+	}
+
+	tests := []tc{
+		{
+			name:       "open interval from now includes in-progress and future slots",
+			between:    common.Interval{Start: base},
+			want:       common.Intervals{slotInProgress, slotAfterStart, slotAfterAllRanges},
+			wantCustID: "c1",
+		},
+		{
+			name:       "bounded interval intersects only first slot",
+			between:    common.Interval{Start: base, End: base.Add(45 * time.Minute)},
+			want:       common.Intervals{slotInProgress},
+			wantCustID: "c1",
+		},
+		{
+			name:       "bounded interval intersects middle slot only",
+			between:    common.Interval{Start: base.Add(45 * time.Minute), End: base.Add(100 * time.Minute)},
+			want:       common.Intervals{slotAfterStart},
+			wantCustID: "c1",
+		},
+		{
+			name:       "bounded interval with no overlap returns empty",
+			between:    common.Interval{Start: base.Add(100 * time.Minute), End: base.Add(120 * time.Minute)},
+			want:       common.Intervals{},
+			wantCustID: "c1",
+		},
+		{
+			name:       "different customer is filtered out",
+			between:    common.Interval{Start: base},
+			want:       common.Intervals{},
+			wantCustID: "unknown-customer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := storage.GetCustomerAppointmentsInRange("b1", tt.wantCustID, tt.between)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("unexpected slots count: got %d want %d", len(got), len(tt.want))
+			}
+
+			for i := range tt.want {
+				if got[i].Customer != tt.wantCustID {
+					t.Fatalf("unexpected customer id in result: got %q want %q", got[i].Customer, tt.wantCustID)
+				}
+				if got[i].Start != tt.want[i].Start || got[i].End != tt.want[i].End {
+					t.Fatalf(
+						"unexpected slot[%d]: got [%s - %s], want [%s - %s]",
+						i,
+						got[i].Start.Format(time.RFC3339),
+						got[i].End.Format(time.RFC3339),
+						tt.want[i].Start.Format(time.RFC3339),
+						tt.want[i].End.Format(time.RFC3339),
+					)
+				}
+			}
+		})
+	}
+}
