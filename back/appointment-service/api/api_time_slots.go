@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -56,6 +57,19 @@ func getTimeFromURL(key string, v url.Values) (time.Time, error) {
 	return dt, nil
 }
 
+func getTimeFromURLOptional(key string, v url.Values) (time.Time, error) {
+	dtStr := v.Get(key)
+	if dtStr == "" {
+		return time.Time{}, fmt.Errorf("%s: %w", key, common.ErrNotFound)
+	}
+
+	dt, err := parseTime(dtStr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return dt, nil
+}
+
 func getSlotChunkFromURL(v url.Values, defaults slotsdb.BusinessSlotSettings) (time.Duration, error) {
 	chunkMinutesStr := v.Get("chunk_minutes")
 	if chunkMinutesStr == "" {
@@ -96,6 +110,68 @@ func (a *api) SlotsBusinessWebAppGetFunc(au AddSlotsAuth) http.HandlerFunc {
 		}
 
 		a.getSlotsByBusinessID(w, r, string(authResult.Business))
+	}
+}
+
+func (a *api) CustomerAppointmentsGetFunc(au AddSlotsAuth) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+		authResult, err := au.Authorization(r)
+		if err != nil {
+			slog.WarnContext(r.Context(), "[CustomerAppointmentsGet]", "err", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		dateStart, err := getTimeFromURLOptional("date_start", r.URL.Query())
+		if err != nil {
+			if errors.Is(err, common.ErrNotFound) {
+				dateStart = time.Now()
+			} else {
+				slog.WarnContext(r.Context(), "[CustomerAppointmentsGet]", "err", err.Error())
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		if dateStart.IsZero() {
+			dateStart = time.Now()
+		}
+
+		dateEnd, err := getTimeFromURLOptional("date_end", r.URL.Query())
+		if err != nil && !errors.Is(err, common.ErrNotFound) {
+			slog.WarnContext(r.Context(), "[CustomerAppointmentsGet]", "err", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if !dateEnd.IsZero() && dateEnd.Before(dateStart) {
+			slog.WarnContext(r.Context(), "[CustomerAppointmentsGet] date_end is before date_start")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		between := common.Interval{Start: dateStart, End: dateEnd}
+		appointments, err := a.storages.TimeSlots.GetCustomerAppointmentsInRange(authResult.Business, authResult.Customer, between)
+		if err != nil {
+			slog.WarnContext(r.Context(), "[CustomerAppointmentsGet]", "err", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		var response swagger.AvailableSlots
+		response.QueryId = r.Context().Value(RequestIdKey{}).(string)
+		for _, appt := range appointments {
+			response.Slots = append(response.Slots, swagger.Slot{
+				TpStart: appt.Start,
+				Len:     int32(appt.End.Sub(appt.Start).Minutes()),
+			})
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.WarnContext(r.Context(), "[CustomerAppointmentsGet]", "err", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
