@@ -6,6 +6,8 @@ import (
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -69,7 +71,7 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 	m := make(map[string]struct{}, len(ops))
 	for _, v := range ops {
 		t := v.Start.In(loc)
-		key := t.Format(time.DateOnly)
+		key := t.Format(time.DateOnly) //TODO need Localization here
 		m[key] = struct{}{}
 	}
 
@@ -82,11 +84,15 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 			chatOptions[i].Text = k //TODO need Localization here (https://github.com/LevWi/scheduler/issues/18)
 			i++
 		}
+		slices.SortFunc(chatOptions, func(a, b chat.ChatOption) int {
+			return strings.Compare(a.Text, b.Text)
+		})
 	} else {
 		chatOptions = make([]chat.ChatOption, len(ops))
+		localized = fmt.Sprintf("%s\n%s:", localized, ops[0].Start.In(loc).Format(time.DateOnly)) //TODO need Localization here
 		for i, v := range ops {
 			chatOptions[i].ID = fmt.Sprintf("%s%d", SlotMarker, v.ID)
-			chatOptions[i].Text = v.Start.Format(time.DateTime) //TODO need Localization here
+			chatOptions[i].Text = v.Start.In(loc).Format(time.TimeOnly) //TODO need Localization here
 		}
 	}
 

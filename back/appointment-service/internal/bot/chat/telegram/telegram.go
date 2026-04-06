@@ -75,14 +75,24 @@ func (t *Tg) HideMenu(c *chat.ChatContext) error {
 }
 
 func toInlineKeyboardButton(in []chat.ChatOption) [][]models.InlineKeyboardButton {
-	var out [][]models.InlineKeyboardButton
-	for _, v := range in {
-		b := []models.InlineKeyboardButton{
-			{
-				Text:         v.Text,
-				CallbackData: fmt.Sprintf("slot_id_%v", v.ID)}, //TODO fix it
+	columns := 1
+	if len(in) > 7 {
+		columns = 3
+	}
+	rows := len(in) / columns
+	if len(in)%columns != 0 {
+		rows += 1
+	}
+	out := make([][]models.InlineKeyboardButton, rows)
+	for i, v := range in {
+		row := out[i/columns]
+		if row == nil {
+			row = make([]models.InlineKeyboardButton, 0, columns)
 		}
-		out = append(out, b)
+		out[i/columns] = append(row, models.InlineKeyboardButton{
+			Text:         v.Text,
+			CallbackData: fmt.Sprintf("slot_id_%v", v.ID)}, //TODO fix it
+		)
 	}
 	return out
 }
