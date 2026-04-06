@@ -11,7 +11,8 @@ func NewDefaultMainMenu(chat chat.Chat, l *messages.Localization, connection *bo
 	if err != nil {
 		return nil, err
 	}
-	return newMainMenu(md, newDefaultSlotSelectionCommand(md, connection)), nil
+	appointments := &HttpAppointment{Connection: connection}
+	return newMainMenu(md, newDefaultSlotSelectionCommand(md, connection), appointments), nil
 }
 
 func newDefaultSlotSelectionCommand(md *MenuDeps, connection *bot.SchedulerConnection) *SlotSelectionCommand {

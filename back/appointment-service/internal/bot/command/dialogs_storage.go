@@ -42,8 +42,9 @@ func (ds *DialogsStorage) GetOrCreateMenu(ca Customer, ch chat.ChatID) *MainMenu
 	dialog = ds.dialogs[ca]
 	if dialog == nil || dialog.ChatID != ch {
 		clone := ds.depsProto.Clone()
+		appointments := &HttpAppointment{Connection: ds.connection}
 		dialog = &DialogValue{
-			Menu:   newMainMenu(clone, newDefaultSlotSelectionCommand(clone, ds.connection)),
+			Menu:   newMainMenu(clone, newDefaultSlotSelectionCommand(clone, ds.connection), appointments),
 			ChatID: ch,
 		}
 		ds.dialogs[ca] = dialog

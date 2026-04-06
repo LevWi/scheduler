@@ -42,6 +42,21 @@ var BookSlot = &i18n.Message{
 	Other: "book a slot",
 }
 
+var Appointments = &i18n.Message{
+	ID:    "Appointments",
+	Other: "appointments",
+}
+
+var AppointmentsListHeader = &i18n.Message{
+	ID:    "AppointmentsListHeader",
+	Other: "Your upcoming appointments:",
+}
+
+var NoUpcomingAppointments = &i18n.Message{
+	ID:    "NoUpcomingAppointments",
+	Other: "No upcoming appointments",
+}
+
 var WrongUserInput = &i18n.Message{
 	ID:    "WrongUserInput",
 	Other: "Input text is unexpected",
@@ -62,6 +77,7 @@ var HelpMessage = &i18n.Message{
 	Other: `Available commands:
 "help" - Show this help message
 "book a slot"   - Book a slot for an appointment
+"appointments" - Show your upcoming appointments
 "cancel" - Cancel current operation or booking
 Use special button or type it
 `,

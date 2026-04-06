@@ -17,6 +17,10 @@ type HttpAppointment struct {
 	Connection *bot.SchedulerConnection
 }
 
+type AppointmentsProvider interface {
+	CustomerAppointmentsInRange(ctx context.Context, customer common.ID, interval common.Interval) ([]common.Slot, error)
+}
+
 func (a *HttpAppointment) AddSlots(ctx context.Context, customer common.ID, slots []common.Slot) error {
 	u, err := url.JoinPath(a.Connection.URL, "slots/bt")
 	if err != nil {
@@ -96,6 +100,56 @@ func (p *HttpAppointment) AvailableSlotsInRange(ctx context.Context, interval co
 		tmp.Start = slot.TpStart
 		tmp.Dur = time.Minute * time.Duration(slot.Len)
 		out = append(out, tmp)
+	}
+	return out, nil
+}
+
+func (p *HttpAppointment) CustomerAppointmentsInRange(ctx context.Context, customer common.ID, interval common.Interval) ([]common.Slot, error) {
+	u, err := url.JoinPath(p.Connection.URL, "customer/appointments/bt")
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-Client-ID", p.Connection.ClientId)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", p.Connection.Token))
+
+	v := req.URL.Query()
+	v.Set("customer_id", string(customer))
+	if !interval.Start.IsZero() {
+		v.Set("date_start", interval.Start.Format(time.RFC3339))
+	}
+	if !interval.End.IsZero() {
+		v.Set("date_end", interval.End.Format(time.RFC3339))
+	}
+	req.URL.RawQuery = v.Encode()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = checkStatusCode(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var slots swagger.AvailableSlots
+	err = json.NewDecoder(resp.Body).Decode(&slots)
+	if err != nil {
+		return nil, fmt.Errorf("http: unexpected response (%s)", resp.Status)
+	}
+
+	out := make([]common.Slot, 0, len(slots.Slots))
+	for _, slot := range slots.Slots {
+		out = append(out, common.Slot{
+			Start: slot.TpStart,
+			Dur:   time.Minute * time.Duration(slot.Len),
+		})
 	}
 	return out, nil
 }

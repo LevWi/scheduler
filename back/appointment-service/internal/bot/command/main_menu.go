@@ -1,13 +1,16 @@
 package command
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
@@ -67,6 +70,7 @@ func NewMenuDeps(ch chat.Chat, loc *messages.Localization) (*MenuDeps, error) {
 func commandMap(l *i18n.Localizer) (messages.MessageMap, error) {
 	return messages.LocalizedMessageMap(l,
 		messages.BookSlot,
+		messages.Appointments,
 		messages.Help,
 		messages.NextWeek,
 		messages.ThisWeek,
@@ -78,6 +82,7 @@ func commandMap(l *i18n.Localizer) (messages.MessageMap, error) {
 type MainMenu struct {
 	menuDeps     *MenuDeps
 	slotCommands *SlotSelectionCommand
+	appointments AppointmentsProvider
 	state        mainMenuState
 }
 
@@ -112,6 +117,8 @@ func (menu *MainMenu) Process(r *Request) error {
 				return err
 			}
 			menu.state = menuSlotSelection
+		} else if c == messages.Appointments {
+			return menu.ShowAppointments(r.Ctx, r.ChatContext, common.ID(r.Customer), time.Now())
 		} else if c == messages.Help || r.Text == "/help" {
 			return menu.ShowHelp(r.ChatContext)
 		} else {
@@ -156,7 +163,7 @@ func (menu *MainMenu) showMessageForce(c *chat.ChatContext, msg *i18n.Message) e
 func (menu *MainMenu) BackToStart(c *chat.ChatContext) error {
 	menu.state = menuStart
 	menu.slotCommands.Cancel()
-	options := []*i18n.Message{messages.BookSlot, messages.Help, messages.Cancel}
+	options := []*i18n.Message{messages.BookSlot, messages.Appointments, messages.Help, messages.Cancel}
 	err := menu.menuDeps.Chat().ShowMenuMessages(c, messages.CommandRequestMessage, options)
 	if err != nil {
 		slog.ErrorContext(c.Ctx, "mainMenu.BackToStart", "err", err.Error())
@@ -165,10 +172,54 @@ func (menu *MainMenu) BackToStart(c *chat.ChatContext) error {
 	return nil
 }
 
-func newMainMenu(md *MenuDeps, slotCommands *SlotSelectionCommand) *MainMenu {
+func (menu *MainMenu) ShowAppointments(ctx context.Context, c *chat.ChatContext, customer common.ID, now time.Time) error {
+	appointments, err := menu.appointments.CustomerAppointmentsInRange(ctx, customer, common.Interval{Start: now})
+	if err != nil {
+		return err
+	}
+
+	msg := formatAppointmentsMessage(menu.menuDeps.Loc.Localizer(), appointments)
+	return menu.menuDeps.Chat().PrintMessage(c, &i18n.Message{ID: "AppointmentsList", Other: msg})
+}
+
+func formatAppointmentsMessage(l *i18n.Localizer, appointments []common.Slot) string {
+	header, err := l.LocalizeMessage(messages.AppointmentsListHeader)
+	if err != nil {
+		header = messages.AppointmentsListHeader.Other
+	}
+	noUpcoming, err := l.LocalizeMessage(messages.NoUpcomingAppointments)
+	if err != nil {
+		noUpcoming = messages.NoUpcomingAppointments.Other
+	}
+
+	if len(appointments) == 0 {
+		return noUpcoming
+	}
+
+	apptSorted := make([]common.Slot, len(appointments))
+	copy(apptSorted, appointments)
+	sort.Slice(apptSorted, func(i, j int) bool {
+		return apptSorted[i].Start.Before(apptSorted[j].Start)
+	})
+
+	var b strings.Builder
+	b.WriteString(header)
+	b.WriteString("\n")
+	for _, appt := range apptSorted {
+		b.WriteString("- ")
+		b.WriteString(appt.Start.Format(time.DateTime))
+		b.WriteString(" (")
+		b.WriteString(appt.Dur.String())
+		b.WriteString(")\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func newMainMenu(md *MenuDeps, slotCommands *SlotSelectionCommand, appointments AppointmentsProvider) *MainMenu {
 	return &MainMenu{
 		menuDeps:     md,
 		slotCommands: slotCommands,
+		appointments: appointments,
 		state:        menuStart,
 	}
 }
