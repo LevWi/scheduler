@@ -188,6 +188,12 @@ func (a *api) addTimeSlotsHandlers(r *mux.Router) {
 			}),
 		},
 		Route{
+			"CustomerAppointmentsGetFromBot",
+			"GET",
+			"/customer/appointments/bt",
+			AuthHandler(botAuthMethod(&bs), a.CustomerAppointmentsGetFunc(AddSlotsAuthFromUrl{}), http.HandlerFunc(LoginRequired)),
+		},
+		Route{
 			"SlotsBusinessIdPost",
 			"POST",
 			"/slots",
