@@ -239,8 +239,7 @@ func (a *api) addBusinessRulesHandlers(r *mux.Router) {
 // TODO
 // Deprecated: Move from service logic
 func (a *api) AppendFileServerLogic(dir string, r *mux.Router) {
-	r.Methods("GET").PathPrefix("/front/").Name("FileServer").
-		Handler(http.StripPrefix("/front/", http.FileServer(http.Dir(dir))))
+	r.Methods("GET").Name("FileServer").Handler(http.FileServer(http.Dir(dir)))
 }
 
 func LoginRequired(w http.ResponseWriter, r *http.Request) {
