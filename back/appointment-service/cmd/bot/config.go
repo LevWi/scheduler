@@ -11,7 +11,7 @@ type BotConfig struct {
 	BotAPIConnection    string                  `cfg:"bot_api_connection"`
 	LogLevel            slog.Level              `cfg:"log_level"`
 	SchedulerAPI        bot.SchedulerConnection `cfg:"scheduler"`
-	DefaultUserSettings bot.DefaultUserSettings `cfg:"default_user"`
+	DefaultUserSettings bot.DefaultUserSettings `cfg:"def_user_settings"`
 }
 
 func (c *BotConfig) Validate() error {

@@ -105,7 +105,6 @@ func (menu *MainMenu) ShowHelp(c *chat.ChatContext) error {
 
 // TODO need user time zone setting (https://github.com/LevWi/scheduler/issues/17)
 func (menu *MainMenu) Process(r *Request) error {
-	r.Text = strings.ToLower(r.Text)
 	c := menu.menuDeps.MM.IdentifyMessage(r.Text)
 
 	if r.Text == "/start" {
