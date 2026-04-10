@@ -39,3 +39,7 @@ func (DateFormatKz) MonthShort(m time.Month) string {
 func (DateFormatKz) WeekDayShort(d time.Weekday) string {
 	return weekdaysShortKz[d]
 }
+
+func (DateFormatKz) MinShort() string {
+	return "мин"
+}

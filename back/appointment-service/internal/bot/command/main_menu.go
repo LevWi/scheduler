@@ -205,11 +205,12 @@ func (menu *MainMenu) ShowAppointments(ctx context.Context, c *chat.ChatContext,
 		return err
 	}
 
-	msg := formatAppointmentsMessage(menu.menuDeps.UserSettings.Loc.Localizer(), appointments, menu.menuDeps.UserSettings.TimeZone)
-	return menu.menuDeps.Chat().PrintMessage(c, &i18n.Message{ID: "AppointmentsList", Other: msg})
+	msg := menu.formatAppointmentsMessage(appointments)
+	return menu.menuDeps.Chat().Print(c, msg)
 }
 
-func formatAppointmentsMessage(l *i18n.Localizer, appointments []common.Slot, loc *time.Location) string {
+func (menu *MainMenu) formatAppointmentsMessage(appointments []common.Slot) string {
+	l := menu.menuDeps.UserSettings.Loc.Localizer()
 	header, err := l.LocalizeMessage(messages.AppointmentsListHeader)
 	if err != nil {
 		header = messages.AppointmentsListHeader.Other
@@ -229,17 +230,19 @@ func formatAppointmentsMessage(l *i18n.Localizer, appointments []common.Slot, lo
 		return apptSorted[i].Start.Before(apptSorted[j].Start)
 	})
 
+	location := menu.menuDeps.UserSettings.TimeZone
+	dateFormatter := menu.menuDeps.UserSettings.Loc.DF
+
 	var b strings.Builder
 	b.WriteString(header)
-	b.WriteString("\n")
 	for _, appt := range apptSorted {
-		b.WriteString("- ")
-		b.WriteString(appt.Start.In(loc).Format(time.DateTime))
-		b.WriteString(" (")
-		b.WriteString(appt.Dur.String())
-		b.WriteString(")\n")
+		tp := appt.Start.In(location)
+		_, month, day := tp.Date()
+		hour, min, _ := tp.Clock()
+		fmt.Fprintf(&b, "\n%s %02d %s | %02d:%02d | %d %s", dateFormatter.WeekDayShort(tp.Weekday()), day, dateFormatter.MonthShort(month),
+			hour, min, int(appt.Dur.Minutes()), dateFormatter.MinShort())
 	}
-	return strings.TrimRight(b.String(), "\n")
+	return b.String()
 }
 
 func newMainMenu(md *MenuDeps, slotCommands *SlotSelectionCommand, appointments AppointmentsProvider) *MainMenu {

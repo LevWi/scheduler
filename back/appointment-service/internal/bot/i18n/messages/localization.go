@@ -18,7 +18,7 @@ func NewLocalization(bundle *i18n.Bundle, langTag string) *Localization {
 	return &Localization{
 		bundle:  bundle,
 		langTag: langTag,
-		DF:      date.DateFormatRu{},
+		DF:      DetectDateFormatter(langTag),
 	}
 }
 
@@ -28,7 +28,7 @@ func (l *Localization) Language() string {
 
 func (l *Localization) SetLanguage(langTag string) {
 	l.langTag = langTag
-	//TODO set DateFormatter
+	l.DF = DetectDateFormatter(langTag)
 }
 
 func (l *Localization) Localizer() *i18n.Localizer {
@@ -42,4 +42,16 @@ func (l *Localization) LocalizerFor(lang string) *i18n.Localizer {
 type DateFormatter interface {
 	MonthShort(m time.Month) string
 	WeekDayShort(d time.Weekday) string
+	MinShort() string
+}
+
+func DetectDateFormatter(langTag string) DateFormatter {
+	switch langTag {
+	case "ru":
+		return date.DateFormatRu{}
+	case "kz":
+		return date.DateFormatKz{}
+	default:
+		return date.DateFormatEn{}
+	}
 }

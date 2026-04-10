@@ -14,8 +14,6 @@ import (
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
-//TODO add here localizer?
-
 type ChatAdapter struct {
 	chat.Chat
 	settings *bot.UserSettings
@@ -68,11 +66,18 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 		return err
 	}
 
-	loc := ca.settings.TimeZone
-	m := make(map[string]struct{}, len(ops))
+	location := ca.settings.TimeZone
+	dateFormatter := ca.settings.Loc.DF
+
+	formatDateShort := func(tp time.Time) string {
+		_, month, day := tp.Date()
+		return fmt.Sprintf("%s %02d %s", dateFormatter.WeekDayShort(tp.Weekday()), day, dateFormatter.MonthShort(month))
+	}
+
+	m := make(map[time.Time]struct{}, len(ops))
 	for _, v := range ops {
-		t := v.Start.In(loc)
-		key := t.Format(time.DateOnly) //TODO need Localization here
+		t := v.Start.In(location)
+		key := common.DayBeginning(t)
 		m[key] = struct{}{}
 	}
 
@@ -80,38 +85,24 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 	if len(m) > 1 {
 		chatOptions = make([]chat.ChatOption, len(m))
 		i := 0
-		for k := range m {
-			chatOptions[i].ID = fmt.Sprintf("%s%s", DayMarker, k)
-			chatOptions[i].Text = k //TODO need Localization here (https://github.com/LevWi/scheduler/issues/18)
+		for tp := range m {
+			chatOptions[i].ID = fmt.Sprintf("%s%s", DayMarker, tp.Format(time.DateOnly))
+			chatOptions[i].Text = formatDateShort(tp)
 			i++
 		}
+		l := len(DayMarker)
 		slices.SortFunc(chatOptions, func(a, b chat.ChatOption) int {
-			return strings.Compare(a.Text, b.Text)
+			return strings.Compare(a.ID[l:], b.ID[l:])
 		})
 	} else {
 		chatOptions = make([]chat.ChatOption, len(ops))
-		localized = fmt.Sprintf("%s\n%s:", localized, ops[0].Start.In(loc).Format(time.DateOnly)) //TODO need Localization here
+		localized = fmt.Sprintf("%s\n%s:", localized, formatDateShort(ops[0].Start.In(location)))
 		for i, v := range ops {
 			chatOptions[i].ID = fmt.Sprintf("%s%d", SlotMarker, v.ID)
-			chatOptions[i].Text = v.Start.In(loc).Format(time.TimeOnly) //TODO need Localization here
+			hour, min, _ := v.Start.In(location).Clock()
+			chatOptions[i].Text = fmt.Sprintf("%02d:%02d (%02d %s)", hour, min, int(v.Dur.Minutes()), dateFormatter.MinShort())
 		}
 	}
 
 	return ca.Chat.ShowOptions(c, localized, chatOptions)
 }
-
-// // TODO move to struct? to bot adapter?
-// func TimeShortFormat(df DateFormatter) TimeFormatFunc {
-// 	return func(t time.Time) string {
-// 		return fmt.Sprintf(
-// 			"%d %s (%s) %02d:%02d",
-// 			t.Day(),
-// 			df.MonthShort(t.Month()),
-// 			df.WeekDayShort(t.Weekday()),
-// 			t.Hour(),
-// 			t.Minute(),
-// 		)
-// 	}
-// }
-
-// type TimeFormatFunc func(time.Time) string
