@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/bot"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
 	"slices"
@@ -17,13 +18,13 @@ import (
 
 type ChatAdapter struct {
 	chat.Chat
-	loc *messages.Localization
+	settings *bot.UserSettings
 }
 
-func NewChatAdapter(chat chat.Chat, loc *messages.Localization) *ChatAdapter {
+func NewChatAdapter(chat chat.Chat, settings *bot.UserSettings) *ChatAdapter {
 	return &ChatAdapter{
-		Chat: chat,
-		loc:  loc,
+		Chat:     chat,
+		settings: settings,
 	}
 }
 
@@ -35,7 +36,7 @@ const (
 var ErrLocalizeMessage = errors.New("localize message error")
 
 func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error {
-	l := ca.loc.Localizer()
+	l := ca.settings.Loc.Localizer()
 	localized, err := l.LocalizeMessage(m)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrLocalizeMessage, err)
@@ -44,7 +45,7 @@ func (ca *ChatAdapter) PrintMessage(c *chat.ChatContext, m *i18n.Message) error 
 }
 
 func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, ops []*i18n.Message) error {
-	l := ca.loc.Localizer()
+	l := ca.settings.Loc.Localizer()
 	localized, err := messages.LocalizeMessages(l, ops)
 	if err != nil {
 		return err
@@ -62,12 +63,12 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
 	}
 
-	localized, err := ca.loc.Localizer().LocalizeMessage(me)
+	localized, err := ca.settings.Loc.Localizer().LocalizeMessage(me)
 	if err != nil {
 		return err
 	}
 
-	loc := ops[0].Start.Location()
+	loc := ca.settings.TimeZone
 	m := make(map[string]struct{}, len(ops))
 	for _, v := range ops {
 		t := v.Start.In(loc)
