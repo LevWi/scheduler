@@ -39,3 +39,7 @@ func (DateFormatRu) MonthShort(m time.Month) string {
 func (DateFormatRu) WeekDayShort(d time.Weekday) string {
 	return weekdaysShortRu[d]
 }
+
+func (DateFormatRu) MinShort() string {
+	return "мин"
+}
