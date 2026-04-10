@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 )
 
 // TODO For slots GET request is no auth required. So business_id used in request only here.
@@ -15,6 +16,11 @@ type SchedulerConnection struct {
 	BusinessID string `cfg:"business_id"`
 	ClientId   string `cfg:"client_id"`
 	Token      string `cfg:"token"`
+}
+
+type DefaultUserSettings struct {
+	Language string `cfg:"language"`
+	TimeZone string `cfg:"time_zone"`
 }
 
 func (s *SchedulerConnection) Validate() error {
@@ -31,6 +37,20 @@ func (s *SchedulerConnection) Validate() error {
 	}
 	if s.Token == "" {
 		return errors.New("scheduler token is not set")
+	}
+	return nil
+}
+
+func (s *DefaultUserSettings) Validate() error {
+	if s.Language == "" {
+		return errors.New("default language is not set")
+	}
+	if s.TimeZone == "" {
+		return errors.New("default time_zone is not set")
+	}
+	_, err := time.LoadLocation(s.TimeZone)
+	if err != nil {
+		return fmt.Errorf("default time_zone check error: %w", err)
 	}
 	return nil
 }

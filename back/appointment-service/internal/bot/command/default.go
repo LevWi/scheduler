@@ -3,11 +3,10 @@ package command
 import (
 	"scheduler/appointment-service/internal/bot"
 	"scheduler/appointment-service/internal/bot/chat"
-	"scheduler/appointment-service/internal/bot/i18n/messages"
 )
 
-func NewDefaultMainMenu(chat chat.Chat, l *messages.Localization, connection *bot.SchedulerConnection) (*MainMenu, error) {
-	md, err := NewMenuDeps(chat, l)
+func NewDefaultMainMenu(chat chat.Chat, userSettings *bot.UserSettings, connection *bot.SchedulerConnection) (*MainMenu, error) {
+	md, err := NewMenuDeps(chat, userSettings)
 	if err != nil {
 		return nil, err
 	}

@@ -47,6 +47,51 @@ var Appointments = &i18n.Message{
 	Other: "appointments",
 }
 
+var Settings = &i18n.Message{
+	ID:    "Settings",
+	Other: "settings",
+}
+
+var SetLanguage = &i18n.Message{
+	ID:    "SetLanguage",
+	Other: "set language",
+}
+
+var SetTimeZone = &i18n.Message{
+	ID:    "SetTimeZone",
+	Other: "set time zone",
+}
+
+var SelectLanguageMessage = &i18n.Message{
+	ID:    "SelectLanguageMessage",
+	Other: "Please select language",
+}
+
+var SelectSettingsOptionMessage = &i18n.Message{
+	ID:    "SelectSettingsOptionMessage",
+	Other: "Please select settings option",
+}
+
+var EnterTimeZoneMessage = &i18n.Message{
+	ID:    "EnterTimeZoneMessage",
+	Other: "Please type time zone (IANA), for example: Europe/Berlin",
+}
+
+var InvalidTimeZone = &i18n.Message{
+	ID:    "InvalidTimeZone",
+	Other: "Invalid time zone",
+}
+
+var LanguageUpdated = &i18n.Message{
+	ID:    "LanguageUpdated",
+	Other: "Language updated",
+}
+
+var TimeZoneUpdated = &i18n.Message{
+	ID:    "TimeZoneUpdated",
+	Other: "Time zone updated",
+}
+
 var AppointmentsListHeader = &i18n.Message{
 	ID:    "AppointmentsListHeader",
 	Other: "Your upcoming appointments:",
@@ -78,6 +123,7 @@ var HelpMessage = &i18n.Message{
 "help" - Show this help message
 "book a slot"   - Book a slot for an appointment
 "appointments" - Show your upcoming appointments
+"settings" - Open language and time zone settings
 "cancel" - Cancel current operation or booking
 Use special button or type it
 `,

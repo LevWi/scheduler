@@ -53,8 +53,14 @@ func main() {
 	bundle.LoadMessageFile(langFilePrefix + ".en.toml")
 
 	localization := messages.NewLocalization(bundle, "ru")
+	defaultLoc, err := time.LoadLocation(cfg.DefaultUserSettings.TimeZone)
+	if err != nil {
+		slog.Error("[time.LoadLocation]", "err", err.Error(), "time_zone", cfg.DefaultUserSettings.TimeZone)
+		log.Fatal(err)
+	}
+	localization.SetLanguage(cfg.DefaultUserSettings.Language)
 	cha := &telegram.Tg{Bot: b}
-	dialogStorage, err := command.NewDialogStorage(cha, localization, &cfg.SchedulerAPI)
+	dialogStorage, err := command.NewDialogStorage(cha, localization, defaultLoc, &cfg.SchedulerAPI)
 	if err != nil {
 		slog.Error("[NewDialogStorage]", "err", err.Error())
 		log.Fatal(err)
@@ -80,7 +86,7 @@ func makeHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 		}
 
 		customer := command.Customer(fmt.Sprint(update.Message.From.ID))
-		menu := ds.GetOrCreateMenu(customer, update.Message.Chat.ID)
+		menu := ds.GetOrCreateMenu(customer, update.Message.Chat.ID, telegramLanguage(update.Message.From), nil)
 		if menu == nil {
 			slog.Error("[bot.HandlerFunc]", "err", "unexpected: menu == nil")
 			return
@@ -104,6 +110,16 @@ func makeHandler(ds *command.DialogsStorage) bot.HandlerFunc {
 			slog.Error("[Handler:menu.Process]", "err", err.Error())
 		}
 	}
+}
+
+func telegramLanguage(user *models.User) string {
+	if user == nil || user.LanguageCode == "" {
+		return ""
+	}
+	if len(user.LanguageCode) < 2 {
+		return user.LanguageCode
+	}
+	return user.LanguageCode[:2]
 }
 
 func makeOptionsCallbackHandler(ds *command.DialogsStorage) bot.HandlerFunc {

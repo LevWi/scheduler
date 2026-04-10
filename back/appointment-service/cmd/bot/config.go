@@ -8,9 +8,10 @@ import (
 )
 
 type BotConfig struct {
-	BotAPIConnection string                  `cfg:"bot_api_connection"`
-	LogLevel         slog.Level              `cfg:"log_level"`
-	SchedulerAPI     bot.SchedulerConnection `cfg:"scheduler"`
+	BotAPIConnection    string                  `cfg:"bot_api_connection"`
+	LogLevel            slog.Level              `cfg:"log_level"`
+	SchedulerAPI        bot.SchedulerConnection `cfg:"scheduler"`
+	DefaultUserSettings bot.DefaultUserSettings `cfg:"default_user"`
 }
 
 func (c *BotConfig) Validate() error {
@@ -22,6 +23,9 @@ func (c *BotConfig) Validate() error {
 	}
 	if c.SchedulerAPI.Token == "" {
 		return errors.New("scheduler_api token is not set")
+	}
+	if err := c.DefaultUserSettings.Validate(); err != nil {
+		return err
 	}
 
 	return c.SchedulerAPI.Validate()

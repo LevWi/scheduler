@@ -74,10 +74,9 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 		var slots []common.Slot
 		switch c {
 		case messages.NextWeek:
-			//TODO what time zone should be used here? Need to take on account user timezone
-			slots, err = sm.deps.Commands.WeekSlots.NextWeek(r.Ctx, r.Time)
+			slots, err = sm.deps.Commands.WeekSlots.NextWeek(r.Ctx, r.Time.In(sm.deps.MD.UserSettings.TimeZone))
 		case messages.ThisWeek:
-			slots, err = sm.deps.Commands.WeekSlots.ThisWeek(r.Ctx, r.Time)
+			slots, err = sm.deps.Commands.WeekSlots.ThisWeek(r.Ctx, r.Time.In(sm.deps.MD.UserSettings.TimeZone))
 		default:
 			err = fmt.Errorf("%w: unexpected message text ID %s (%s)", ErrWrongUserInput, c.ID, r.Text)
 		}
@@ -111,7 +110,7 @@ func (sm *SlotSelectionCommand) Process(r *Request) (SlotSelectionResult, error)
 
 			timeSrt := r.Choices[0][len(DayMarker):]
 			//TODO time zone?
-			date, err := time.Parse(time.DateOnly, timeSrt)
+			date, err := time.ParseInLocation(time.DateOnly, timeSrt, sm.deps.MD.UserSettings.TimeZone)
 			if err != nil {
 				return SlotSelectionResultNotSet, fmt.Errorf("%w: for %v", err, timeSrt)
 			}

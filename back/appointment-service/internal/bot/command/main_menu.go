@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	common "scheduler/appointment-service/internal"
+	"scheduler/appointment-service/internal/bot"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
 	"sort"
@@ -20,49 +21,53 @@ type mainMenuState uint
 const (
 	menuStart mainMenuState = iota
 	menuSlotSelection
+	menuSettings
 )
 
 type MenuDeps struct {
-	chat chat.Chat
-	Loc  *messages.Localization
-	MM   messages.MessageMap
+	chat         chat.Chat
+	UserSettings *bot.UserSettings
+	MM           messages.MessageMap
 }
 
 func (md *MenuDeps) Chat() *ChatAdapter {
-	return NewChatAdapter(md.chat, md.Loc)
+	return NewChatAdapter(md.chat, md.UserSettings)
 }
 
 func (md *MenuDeps) Clone() *MenuDeps {
-	l := *md.Loc
+	l := *md.UserSettings.Loc
 	return &MenuDeps{
 		chat: md.chat,
-		Loc:  &l,
-		MM:   md.MM,
+		UserSettings: &bot.UserSettings{
+			Loc:      &l,
+			TimeZone: md.UserSettings.TimeZone,
+		},
+		MM: md.MM,
 	}
 }
 
 // TODO LangTag . seems it need to rework
 func (md *MenuDeps) SetLanguage(l string) error {
-	if md.Loc.Language() != l {
-		m, err := commandMap(md.Loc.LocalizerFor(l))
+	if md.UserSettings.Loc.Language() != l {
+		m, err := commandMap(md.UserSettings.Loc.LocalizerFor(l))
 		if err != nil {
 			return err
 		}
 		md.MM = m
-		md.Loc.SetLanguage(l)
+		md.UserSettings.Loc.SetLanguage(l)
 	}
 	return nil
 }
 
-func NewMenuDeps(ch chat.Chat, loc *messages.Localization) (*MenuDeps, error) {
-	m, err := commandMap(loc.Localizer())
+func NewMenuDeps(ch chat.Chat, userSettings *bot.UserSettings) (*MenuDeps, error) {
+	m, err := commandMap(userSettings.Loc.Localizer())
 	if err != nil {
 		return nil, err
 	}
 	return &MenuDeps{
-			chat: ch,
-			Loc:  loc,
-			MM:   m,
+			chat:         ch,
+			UserSettings: userSettings,
+			MM:           m,
 		},
 		nil
 }
@@ -71,6 +76,9 @@ func commandMap(l *i18n.Localizer) (messages.MessageMap, error) {
 	return messages.LocalizedMessageMap(l,
 		messages.BookSlot,
 		messages.Appointments,
+		messages.Settings,
+		messages.SetLanguage,
+		messages.SetTimeZone,
 		messages.Help,
 		messages.NextWeek,
 		messages.ThisWeek,
@@ -82,6 +90,7 @@ func commandMap(l *i18n.Localizer) (messages.MessageMap, error) {
 type MainMenu struct {
 	menuDeps     *MenuDeps
 	slotCommands *SlotSelectionCommand
+	settingsMenu *SettingsMenu
 	appointments AppointmentsProvider
 	state        mainMenuState
 }
@@ -118,11 +127,30 @@ func (menu *MainMenu) Process(r *Request) error {
 			}
 			menu.state = menuSlotSelection
 		} else if c == messages.Appointments {
-			return menu.ShowAppointments(r.Ctx, r.ChatContext, common.ID(r.Customer), time.Now())
+			return menu.ShowAppointments(r.Ctx, r.ChatContext, common.ID(r.Customer), time.Now().In(menu.menuDeps.UserSettings.TimeZone))
+		} else if c == messages.Settings {
+			menu.state = menuSettings
+			return menu.settingsMenu.ShowMenu(r.ChatContext)
 		} else if c == messages.Help || r.Text == "/help" {
 			return menu.ShowHelp(r.ChatContext)
 		} else {
 			return menu.showMessageForce(r.ChatContext, messages.WrongUserInput)
+		}
+	case menuSettings:
+		result, err := menu.settingsMenu.Process(r)
+		if err != nil {
+			if errors.Is(err, ErrWrongUserInput) {
+				return menu.showMessageForce(r.ChatContext, messages.WrongUserInput)
+			}
+			return err
+		}
+		switch result {
+		case SettingsResultDone:
+			return menu.BackToStart(r.ChatContext)
+		case SettingsResultContinue:
+			return nil
+		default:
+			return common.ErrInternal
 		}
 	case menuSlotSelection:
 		result, err := menu.slotCommands.Process(r)
@@ -163,7 +191,7 @@ func (menu *MainMenu) showMessageForce(c *chat.ChatContext, msg *i18n.Message) e
 func (menu *MainMenu) BackToStart(c *chat.ChatContext) error {
 	menu.state = menuStart
 	menu.slotCommands.Cancel()
-	options := []*i18n.Message{messages.BookSlot, messages.Appointments, messages.Help, messages.Cancel}
+	options := []*i18n.Message{messages.BookSlot, messages.Appointments, messages.Settings, messages.Help, messages.Cancel}
 	err := menu.menuDeps.Chat().ShowMenuMessages(c, messages.CommandRequestMessage, options)
 	if err != nil {
 		slog.ErrorContext(c.Ctx, "mainMenu.BackToStart", "err", err.Error())
@@ -178,11 +206,11 @@ func (menu *MainMenu) ShowAppointments(ctx context.Context, c *chat.ChatContext,
 		return err
 	}
 
-	msg := formatAppointmentsMessage(menu.menuDeps.Loc.Localizer(), appointments)
+	msg := formatAppointmentsMessage(menu.menuDeps.UserSettings.Loc.Localizer(), appointments, menu.menuDeps.UserSettings.TimeZone)
 	return menu.menuDeps.Chat().PrintMessage(c, &i18n.Message{ID: "AppointmentsList", Other: msg})
 }
 
-func formatAppointmentsMessage(l *i18n.Localizer, appointments []common.Slot) string {
+func formatAppointmentsMessage(l *i18n.Localizer, appointments []common.Slot, loc *time.Location) string {
 	header, err := l.LocalizeMessage(messages.AppointmentsListHeader)
 	if err != nil {
 		header = messages.AppointmentsListHeader.Other
@@ -207,7 +235,7 @@ func formatAppointmentsMessage(l *i18n.Localizer, appointments []common.Slot) st
 	b.WriteString("\n")
 	for _, appt := range apptSorted {
 		b.WriteString("- ")
-		b.WriteString(appt.Start.Format(time.DateTime))
+		b.WriteString(appt.Start.In(loc).Format(time.DateTime))
 		b.WriteString(" (")
 		b.WriteString(appt.Dur.String())
 		b.WriteString(")\n")
@@ -219,6 +247,7 @@ func newMainMenu(md *MenuDeps, slotCommands *SlotSelectionCommand, appointments 
 	return &MainMenu{
 		menuDeps:     md,
 		slotCommands: slotCommands,
+		settingsMenu: newSettingsMenu(md),
 		appointments: appointments,
 		state:        menuStart,
 	}
