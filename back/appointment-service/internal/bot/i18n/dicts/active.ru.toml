@@ -23,7 +23,7 @@ other = "Отмена"
 
 [CommandRequestMessage]
 hash = "sha1-bfb591eb7a6e875891554e733cca04f4f25fcbcf"
-other = "Пожалуйста, введите или выберите команду\n\t(введите \"help\" для справки)"
+other = "Пожалуйста, введите или выберите команду\n\t(введите \"помощь\" для справки)"
 
 [Done]
 hash = "sha1-e9b450d14bc2363d292c84f17cfad5cfbd58a458"
