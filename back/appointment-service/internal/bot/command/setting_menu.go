@@ -71,6 +71,9 @@ func (sm *SettingsMenu) Process(r *Request) (SettingsResult, error) {
 		lang := strings.TrimSpace(strings.ToLower(r.Text))
 		switch lang {
 		case "ru", "en", "kz":
+			if lang == "kz" {
+				lang = "kk"
+			}
 			if err := sm.deps.SetLanguage(lang); err != nil {
 				return SettingsResultNotSet, err
 			}

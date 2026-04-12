@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-var monthsShortKz = map[time.Month]string{
+var monthsShortKk = map[time.Month]string{
 	time.January:   "Қаң",
 	time.February:  "Ақп",
 	time.March:     "Нау",
@@ -19,7 +19,7 @@ var monthsShortKz = map[time.Month]string{
 	time.December:  "Жел",
 }
 
-var weekdaysShortKz = map[time.Weekday]string{
+var weekdaysShortKk = map[time.Weekday]string{
 	time.Monday:    "Дс",
 	time.Tuesday:   "Сс",
 	time.Wednesday: "Ср",
@@ -29,17 +29,17 @@ var weekdaysShortKz = map[time.Weekday]string{
 	time.Sunday:    "Жс",
 }
 
-type DateFormatKz struct {
+type DateFormatKK struct {
 }
 
-func (DateFormatKz) MonthShort(m time.Month) string {
-	return monthsShortKz[m]
+func (DateFormatKK) MonthShort(m time.Month) string {
+	return monthsShortKk[m]
 }
 
-func (DateFormatKz) WeekDayShort(d time.Weekday) string {
-	return weekdaysShortKz[d]
+func (DateFormatKK) WeekDayShort(d time.Weekday) string {
+	return weekdaysShortKk[d]
 }
 
-func (DateFormatKz) MinShort() string {
+func (DateFormatKK) MinShort() string {
 	return "мин"
 }
