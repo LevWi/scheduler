@@ -11,6 +11,7 @@ import (
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/chat/telegram"
 	"scheduler/appointment-service/internal/bot/command"
+	"scheduler/appointment-service/internal/bot/i18n/dicts"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
 	"time"
 
@@ -48,17 +49,19 @@ func main() {
 
 	bundle := i18n.NewBundle(language.Russian)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
-	const langFilePrefix = "bot.dict"
-	bundle.LoadMessageFile(langFilePrefix + ".ru.toml")
-	bundle.LoadMessageFile(langFilePrefix + ".en.toml")
-
-	localization := messages.NewLocalization(bundle, "ru")
+	for _, d := range [3]string{"active.en.toml", "active.kk.toml", "active.ru.toml"} {
+		_, err := bundle.LoadMessageFileFS(dicts.BotDictFiles, d)
+		if err != nil {
+			slog.Error("[bundle.LoadMessageFileFS]", "err", err.Error())
+			log.Fatal(err)
+		}
+	}
+	localization := messages.NewLocalization(bundle, cfg.DefaultUserSettings.Language)
 	defaultLoc, err := time.LoadLocation(cfg.DefaultUserSettings.TimeZone)
 	if err != nil {
 		slog.Error("[time.LoadLocation]", "err", err.Error(), "time_zone", cfg.DefaultUserSettings.TimeZone)
 		log.Fatal(err)
 	}
-	localization.SetLanguage(cfg.DefaultUserSettings.Language)
 	cha := &telegram.Tg{Bot: b}
 	dialogStorage, err := command.NewDialogStorage(cha, localization, defaultLoc, &cfg.SchedulerAPI)
 	if err != nil {

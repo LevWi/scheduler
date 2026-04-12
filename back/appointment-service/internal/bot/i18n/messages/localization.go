@@ -49,8 +49,8 @@ func DetectDateFormatter(langTag string) DateFormatter {
 	switch langTag {
 	case "ru":
 		return date.DateFormatRu{}
-	case "kz":
-		return date.DateFormatKz{}
+	case "kk":
+		return date.DateFormatKK{}
 	default:
 		return date.DateFormatEn{}
 	}

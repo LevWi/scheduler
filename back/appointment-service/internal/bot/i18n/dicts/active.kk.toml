@@ -1,0 +1,112 @@
+[Appointments]
+hash = "sha1-88e546d80c6780f88158853a5134fee8f6454378"
+other = "жазбалар"
+
+[AppointmentsListHeader]
+hash = "sha1-f637db4f36b9ad3fd0d9b04ebd00d5277c5b420b"
+other = "Сіздің алдағы жазбаларыңыз:"
+
+[AvailableSlots]
+hash = "sha1-58075ac6720491c2f8d31f932460c7b3f067d07b"
+one = "Қолжетімді уақыт"
+other = "Қолжетімді уақыттар"
+
+[BookSlot]
+hash = "sha1-c134f534da8a47986e05e6a95e2423b7aed40943"
+other = "жазылу"
+
+[Cancel]
+hash = "sha1-77dfd2135f4db726c47299bb55be26f7f4525a46"
+other = "Бас тарту"
+
+[CommandRequestMessage]
+hash = "sha1-bfb591eb7a6e875891554e733cca04f4f25fcbcf"
+other = "Өтінеміз, команданы енгізіңіз немесе таңдаңыз\n\t(қосымша ақпарат үшін \"көмек\" деп жазыңыз)"
+
+[Done]
+hash = "sha1-e9b450d14bc2363d292c84f17cfad5cfbd58a458"
+other = "Дайын"
+
+[EnterTimeZoneMessage]
+hash = "sha1-d379cd19b7c7605cfecb962b89a8d0c5ed8d3093"
+other = "Өтінеміз, уақыт белдеуін енгізіңіз (IANA), мысалы: Europe/Berlin"
+
+[Help]
+hash = "sha1-c47ae15370cfe1ed2781eedc1dc2547d12d9e972"
+other = "көмек"
+
+[HelpMessage]
+hash = "sha1-71eb6bbcf1527e607acf5546c30d79629f22cc34"
+other = "Қолжетімді командалар:\n\"көмек\" - Бұл хабарламаны көрсету\n\"жазылу\" - Жазылу\n\"жазбалар\" - Алдағы жазбаларды көрсету\n\"баптаулар\" - Тіл және уақыт белдеуі баптауларын ашу\n\"бас тарту\" - Ағымдағы әрекетті немесе жазбаны болдырмау\nАрнайы батырманы пайдаланыңыз немесе команданы енгізіңіз\n"
+
+[InternalErrorOccurred]
+hash = "sha1-33f227e33ba06159085827653a5837159cca094c"
+other = "Ішкі қате орын алды"
+
+[InvalidTimeZone]
+hash = "sha1-214600dbb0de11fe437afcf0bee47541bcfbd794"
+other = "Жарамсыз уақыт белдеуі"
+
+[LangEn]
+hash = "sha1-094b0fe0e302854af1311afab85b5203ba457a3b"
+other = "en"
+
+[LangKz]
+hash = "sha1-efb215f8f79524f9503c2254db6f4fe97383655c"
+other = "kz"
+
+[LangRu]
+hash = "sha1-67b8b1c4fedb2e38e2eb26f403b9c2b2642b0a2c"
+other = "ru"
+
+[LanguageUpdated]
+hash = "sha1-985d32ccd2dd1e7d2f8ba28ea7db59fecc84c823"
+other = "Тіл жаңартылды"
+
+[NextWeek]
+hash = "sha1-5a20763adfb0adcac05270a340009a8526652248"
+other = "Келесі апта"
+
+[NoSlotsFound]
+hash = "sha1-bb5ec912aa308b7a67ddfedb062cc43b6a3e9fa6"
+other = "Қолжетімді уақыттар жоқ"
+
+[NoUpcomingAppointments]
+hash = "sha1-2ecd4db2610bfb20c39accc7fdf0a5579fda4f7f"
+other = "Алдағы жазбалар жоқ"
+
+[SelectLanguageMessage]
+hash = "sha1-745b6c2ddce663457fb0630aa1bfe154ef90b47c"
+other = "Өтінеміз, тілді таңдаңыз"
+
+[SelectRequestMessage]
+hash = "sha1-16a41552a20953509d63fd3263aa58349b3d382e"
+other = "Өтінеміз, нұсқаны таңдаңыз"
+
+[SelectSettingsOptionMessage]
+hash = "sha1-d99de2fa6e9b437cac76477e2e45b3e7f95ad2f4"
+other = "Өтінеміз, баптауды таңдаңыз"
+
+[SetLanguage]
+hash = "sha1-369e9f4310875487fbadcde8d2eed2858bda4ed2"
+other = "тілді өзгерту"
+
+[SetTimeZone]
+hash = "sha1-8c84ad74ebfa6a0b2cfccadf27dfcd6e4840d111"
+other = "уақыт белдеуін орнату"
+
+[Settings]
+hash = "sha1-3cc1d5a427a45820b04fe30f78a972b784952460"
+other = "баптаулар"
+
+[ThisWeek]
+hash = "sha1-7b72883e078a6858cf0c79bf3e93e72e765e9ada"
+other = "Осы апта"
+
+[TimeZoneUpdated]
+hash = "sha1-f68d3e3bede8c31a26cc1ba5cec6c22acc76730b"
+other = "Уақыт белдеуі жаңартылды"
+
+[WrongUserInput]
+hash = "sha1-0499f6d5ec3eaa786d4957bf62d04f06f447ce09"
+other = "Қате енгізу"

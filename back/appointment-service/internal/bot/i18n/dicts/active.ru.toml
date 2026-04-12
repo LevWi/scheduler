@@ -1,0 +1,114 @@
+[Appointments]
+hash = "sha1-88e546d80c6780f88158853a5134fee8f6454378"
+other = "записи"
+
+[AppointmentsListHeader]
+hash = "sha1-f637db4f36b9ad3fd0d9b04ebd00d5277c5b420b"
+other = "Ваши предстоящие записи:"
+
+[AvailableSlots]
+few = "Доступные слоты"
+hash = "sha1-58075ac6720491c2f8d31f932460c7b3f067d07b"
+many = "Доступные слоты"
+one = "Доступный слот"
+other = "Доступные слоты"
+
+[BookSlot]
+hash = "sha1-c134f534da8a47986e05e6a95e2423b7aed40943"
+other = "записаться"
+
+[Cancel]
+hash = "sha1-77dfd2135f4db726c47299bb55be26f7f4525a46"
+other = "Отмена"
+
+[CommandRequestMessage]
+hash = "sha1-bfb591eb7a6e875891554e733cca04f4f25fcbcf"
+other = "Пожалуйста, введите или выберите команду\n\t(введите \"помощь\" для справки)"
+
+[Done]
+hash = "sha1-e9b450d14bc2363d292c84f17cfad5cfbd58a458"
+other = "Готово"
+
+[EnterTimeZoneMessage]
+hash = "sha1-d379cd19b7c7605cfecb962b89a8d0c5ed8d3093"
+other = "Пожалуйста, введите часовой пояс (IANA), например: Europe/Berlin"
+
+[Help]
+hash = "sha1-c47ae15370cfe1ed2781eedc1dc2547d12d9e972"
+other = "Помощь"
+
+[HelpMessage]
+hash = "sha1-71eb6bbcf1527e607acf5546c30d79629f22cc34"
+other = "Доступные команды:\n\"помощь\" - Показать это сообщение\n\"записаться\" - Записаться\n\"записи\" - Показать предстоящие записи\n\"настройки\" - Открыть настройки языка и часового пояса\n\"отмена\" - Отменить текущую операцию или запись\nИспользуйте кнопку или введите команду\n"
+
+[InternalErrorOccurred]
+hash = "sha1-33f227e33ba06159085827653a5837159cca094c"
+other = "Произошла внутренняя ошибка"
+
+[InvalidTimeZone]
+hash = "sha1-214600dbb0de11fe437afcf0bee47541bcfbd794"
+other = "Неверный часовой пояс"
+
+[LangEn]
+hash = "sha1-094b0fe0e302854af1311afab85b5203ba457a3b"
+other = "en"
+
+[LangKz]
+hash = "sha1-efb215f8f79524f9503c2254db6f4fe97383655c"
+other = "kz"
+
+[LangRu]
+hash = "sha1-67b8b1c4fedb2e38e2eb26f403b9c2b2642b0a2c"
+other = "ru"
+
+[LanguageUpdated]
+hash = "sha1-985d32ccd2dd1e7d2f8ba28ea7db59fecc84c823"
+other = "Язык обновлён"
+
+[NextWeek]
+hash = "sha1-5a20763adfb0adcac05270a340009a8526652248"
+other = "Следующая неделя"
+
+[NoSlotsFound]
+hash = "sha1-bb5ec912aa308b7a67ddfedb062cc43b6a3e9fa6"
+other = "Нет доступных слотов"
+
+[NoUpcomingAppointments]
+hash = "sha1-2ecd4db2610bfb20c39accc7fdf0a5579fda4f7f"
+other = "Нет предстоящих записей"
+
+[SelectLanguageMessage]
+hash = "sha1-745b6c2ddce663457fb0630aa1bfe154ef90b47c"
+other = "Пожалуйста, выберите язык"
+
+[SelectRequestMessage]
+hash = "sha1-16a41552a20953509d63fd3263aa58349b3d382e"
+other = "Пожалуйста, выберите вариант"
+
+[SelectSettingsOptionMessage]
+hash = "sha1-d99de2fa6e9b437cac76477e2e45b3e7f95ad2f4"
+other = "Пожалуйста, выберите настройку"
+
+[SetLanguage]
+hash = "sha1-369e9f4310875487fbadcde8d2eed2858bda4ed2"
+other = "сменить язык"
+
+[SetTimeZone]
+hash = "sha1-8c84ad74ebfa6a0b2cfccadf27dfcd6e4840d111"
+other = "установить часовой пояс"
+
+[Settings]
+hash = "sha1-3cc1d5a427a45820b04fe30f78a972b784952460"
+other = "настройки"
+
+[ThisWeek]
+hash = "sha1-7b72883e078a6858cf0c79bf3e93e72e765e9ada"
+other = "Эта неделя"
+
+[TimeZoneUpdated]
+hash = "sha1-f68d3e3bede8c31a26cc1ba5cec6c22acc76730b"
+other = "Часовой пояс обновлён"
+
+[WrongUserInput]
+hash = "sha1-0499f6d5ec3eaa786d4957bf62d04f06f447ce09"
+other = "Некорректный ввод"
