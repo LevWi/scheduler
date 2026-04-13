@@ -56,12 +56,32 @@ func (ca *ChatAdapter) ShowMenuMessages(c *chat.ChatContext, m *i18n.Message, op
 	return ca.ShowMenu(c, mess, localized)
 }
 
+func LocationToGMTString(loc *time.Location, t time.Time) string {
+	_, offset := t.In(loc).Zone()
+
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		offset = -offset
+	}
+
+	h := offset / 3600
+	m := (offset % 3600) / 60
+
+	return fmt.Sprintf("GMT%s%02d:%02d", sign, h, m)
+}
+
 func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops []LabeledSlot) error {
 	if len(ops) == 0 {
 		return fmt.Errorf("%w: slots array too small =%d", common.ErrInvalidArgument, len(ops))
 	}
 
 	localized, err := ca.settings.Loc.Localizer().LocalizeMessage(me)
+	if err != nil {
+		return err
+	}
+
+	localizedTimeZone, err := ca.settings.Loc.Localizer().LocalizeMessage(messages.DialogTimeZone)
 	if err != nil {
 		return err
 	}
@@ -75,10 +95,13 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 	}
 
 	m := make(map[time.Time]struct{}, len(ops))
+	dstCheckM := make(map[int]struct{}, len(ops))
 	for _, v := range ops {
 		t := v.Start.In(location)
 		key := common.DayBeginning(t)
 		m[key] = struct{}{}
+		_, offset := t.Zone()
+		dstCheckM[offset] = struct{}{}
 	}
 
 	var chatOptions []chat.ChatOption
@@ -102,6 +125,12 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 			hour, min, _ := v.Start.In(location).Clock()
 			chatOptions[i].Text = fmt.Sprintf("%02d:%02d (%02d %s)", hour, min, int(v.Dur.Minutes()), dateFormatter.MinShort())
 		}
+	}
+
+	if len(dstCheckM) == 1 {
+		localized = fmt.Sprintf("%s\n%s: %s (%s)", localized, localizedTimeZone, location.String(), LocationToGMTString(location, ops[0].Start))
+	} else {
+		localized = fmt.Sprintf("%s\n%s: %s", localized, localizedTimeZone, location.String())
 	}
 
 	return ca.Chat.ShowOptions(c, localized, chatOptions)
