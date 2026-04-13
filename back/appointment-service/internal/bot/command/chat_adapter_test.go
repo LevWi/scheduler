@@ -2,11 +2,11 @@ package command
 
 import (
 	"context"
-	"strings"
 	common "scheduler/appointment-service/internal"
 	"scheduler/appointment-service/internal/bot"
 	"scheduler/appointment-service/internal/bot/chat"
 	"scheduler/appointment-service/internal/bot/i18n/messages"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,7 +92,7 @@ func TestChatAdapter_ShowAsOptions_OmitsGMTWhenOffsetsDiffer(t *testing.T) {
 		t.Fatalf("ShowAsOptions() error = %v", err)
 	}
 
-	if strings.Contains(cha.showOptionsMessage, "(GMT") {
+	if strings.Contains(cha.showOptionsMessage, "GMT") {
 		t.Fatalf("did not expect GMT offset in message, got: %q", cha.showOptionsMessage)
 	}
 
