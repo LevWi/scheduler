@@ -29,6 +29,9 @@ other = "Пожалуйста, введите или выберите коман
 hash = "sha1-e9b450d14bc2363d292c84f17cfad5cfbd58a458"
 other = "Готово"
 
+[DialogTimeZone]
+other = "Часовой пояс"
+
 [EnterTimeZoneMessage]
 hash = "sha1-d379cd19b7c7605cfecb962b89a8d0c5ed8d3093"
 other = "Пожалуйста, введите часовой пояс (IANA), например: Europe/Berlin"

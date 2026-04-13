@@ -67,6 +67,11 @@ func (ca *ChatAdapter) ShowAsOptions(c *chat.ChatContext, me *i18n.Message, ops 
 	}
 
 	location := ca.settings.TimeZone
+	localizedTimeZone, err := ca.settings.Loc.Localizer().LocalizeMessage(messages.DialogTimeZone)
+	if err != nil {
+		return err
+	}
+	localized = fmt.Sprintf("%s\n%s: %s", localized, localizedTimeZone, location.String())
 	dateFormatter := ca.settings.Loc.DF
 
 	formatDateShort := func(tp time.Time) string {

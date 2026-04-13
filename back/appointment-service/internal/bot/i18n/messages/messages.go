@@ -92,6 +92,11 @@ var TimeZoneUpdated = &i18n.Message{
 	Other: "Time zone updated",
 }
 
+var DialogTimeZone = &i18n.Message{
+	ID:    "DialogTimeZone",
+	Other: "Time zone",
+}
+
 var AppointmentsListHeader = &i18n.Message{
 	ID:    "AppointmentsListHeader",
 	Other: "Your upcoming appointments:",

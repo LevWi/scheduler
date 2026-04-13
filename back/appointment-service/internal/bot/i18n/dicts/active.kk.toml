@@ -27,6 +27,9 @@ other = "Өтінеміз, команданы енгізіңіз немесе т
 hash = "sha1-e9b450d14bc2363d292c84f17cfad5cfbd58a458"
 other = "Дайын"
 
+[DialogTimeZone]
+other = "Уақыт белдеуі"
+
 [EnterTimeZoneMessage]
 hash = "sha1-d379cd19b7c7605cfecb962b89a8d0c5ed8d3093"
 other = "Өтінеміз, уақыт белдеуін енгізіңіз (IANA), мысалы: Europe/Berlin"
